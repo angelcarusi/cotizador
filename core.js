@@ -38,6 +38,10 @@
     { mk: 'ram', md: '1500-classic', label: '1500 Classic', alias: ['ram1500classic', 'classic1500'], match: /1500/i },
     { mk: 'ram', md: '2500', label: '2500', alias: ['ram2500', 'dodgeram2500', 'dodge2500'], match: /2500/i },
     { mk: 'ram', md: '3500', label: '3500', alias: ['ram3500', 'dodgeram3500', 'dodge3500'], match: /3500/i },
+    // Hasta 2010 Rough Country pone las Ram dentro de Dodge (/dodge/ram-1500/); desde 2011 son marca Ram
+    { mk: 'dodge', md: 'ram-1500', label: 'Ram 1500', alias: ['dodgeram1500old'], match: /1500/i, not: /classic|2500|3500/i },
+    { mk: 'dodge', md: 'ram-2500', label: 'Ram 2500', alias: ['dodgeram2500old'], match: /2500/i },
+    { mk: 'dodge', md: 'ram-3500', label: 'Ram 3500', alias: ['dodgeram3500old'], match: /3500/i },
     { mk: 'toyota', md: 'tacoma', label: 'Tacoma', alias: ['tacoma', 'taco'], match: /tacoma/i },
     { mk: 'toyota', md: 'tundra', label: 'Tundra', alias: ['tundra'], match: /tundra/i },
     { mk: 'toyota', md: '4runner', label: '4Runner', alias: ['4runner', 'forerunner', 'fourrunner'], match: /4runner/i },
@@ -115,6 +119,18 @@
     if (/level/i.test(low)) out.kind = 'leveling';
     else if (/\blift|levant/i.test(low) && out.inches != null) out.kind = 'lift';
     return out;
+  }
+
+  // Ram ↔ Dodge según el año (Rough Country: Dodge hasta 2010, Ram desde 2011)
+  const RAM_SPLIT = 2011;
+  function brandForYear(model, year) {
+    if (!model || !year) return model;
+    const num = (String(model.md).match(/(1500|2500|3500)/) || [])[1];
+    if (!num || /classic/i.test(model.md)) return model;
+    const find = (mk, md) => MODELS.find(m => m.mk === mk && m.md === md);
+    if (model.mk === 'ram' && year < RAM_SPLIT) return find('dodge', 'ram-' + num) || model;
+    if (model.mk === 'dodge' && year >= RAM_SPLIT) return find('ram', num) || model;
+    return model;
   }
 
   // ---------- Reglas de precio ----------
@@ -460,7 +476,7 @@
     return { blocks, others, fitsCount: fits.length };
   }
 
-  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, hasDually, mentionsDually, DUALLY_EXTRA, fitmentNotes, fitmentAlerts, notePhrases, slugify, squash };
+  const api = { MAKES, MODELS, makeLabel, resolveModel, brandForYear, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, hasDually, mentionsDually, DUALLY_EXTRA, fitmentNotes, fitmentAlerts, notePhrases, slugify, squash };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Core = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

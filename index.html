@@ -173,7 +173,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='13';
+  var V='14';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -183,7 +183,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=13"></script>
+<script src="core.js?v=14"></script>
 <script>
 (function(){
 'use strict';
@@ -363,6 +363,7 @@ function check(){
 function search(){ const q = check(); if(q) status(''); }
 function openRC(){
   const q = check(); if(!q) return;
+  q.model = C.brandForYear(q.model, q.year); // Ram hasta 2010 está dentro de Dodge en Rough Country
   const url = rcUrl(q);
   status('Abriendo Rough Country · ' + C.makeLabel(q.model.mk) + ' ' + q.model.label + ' ' + q.year + '…');
   $('#results').innerHTML = `<a class="btn main" style="display:block;text-align:center;text-decoration:none" href="${esc(url)}">Abrir Rough Country</a>`;
