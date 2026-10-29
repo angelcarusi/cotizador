@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.3.1
+// @version      1.4.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 6; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 7; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -79,6 +79,9 @@
     .msg{color:#9aa3ab;font-size:13px;margin-top:8px}
     .warn{color:#ffa94d}
     .kits{font-size:12px;color:#9aa3ab;margin-top:6px}
+    .it{margin-top:8px;background:#14171a;border:1px solid #30363c;border-radius:10px;padding:8px 10px;font-size:13px;color:#c5ccd6}
+    .it .itt{font-weight:700;color:#e8eaec;margin-bottom:3px}
+    .it b{color:#ffa94d;font-weight:600}
     .kit{border-top:1px solid #30363c;padding:5px 0;display:flex;gap:6px;align-items:center}
     .kit span{flex:1;min-width:0}
     .kit button{border:1px solid #30363c;background:none;color:#e8eaec;border-radius:8px;padding:4px 8px;font-size:12px}
@@ -164,10 +167,12 @@
         if (n.higher != null) parts.push(C.inchStr(n.higher) + '" (mayor)');
         html += `<div class="msg warn">No hay ${C.inchStr(n.asked)}" para este vehículo. Te pongo ${parts.length > 1 ? 'los más cercanos' : 'el más cercano'}: ${parts.join(' y ')}.</div>`;
       }
-      html += `<pre>${esc(b.text)}</pre><button class="copy" data-b="${bi}">Copiar</button><div class="kits">`;
+      html += `<pre>${esc(b.text)}</pre><button class="copy" data-b="${bi}">Copiar</button>`;
+      const times = b.kits.map(k => { const t = k.url && IT[k.url]; return `<div>${C.inchStr(k.inches)}" ${k.kind}: <b>${t ? esc(t) : (k.url && !(k.url in IT) ? 'buscando…' : '—')}</b></div>`; }).join('');
+      html += `<div class="it"><div class="itt">⏱ Tiempo de instalación aprox.</div>${times}</div><div class="kits">`;
       b.kits.forEach(k => {
         const key = k.url || k.title;
-        html += `<div class="kit"><span>${C.inchStr(k.inches)}" ${k.kind} · ${C.money(k.price)}${k.extra ? ' + ' + C.money(k.extra) : ''} → <b>${C.money(k.sale)}</b> · ${esc(k.title)}</span>${k.kind === 'lift' ? `<button data-shk="${esc(key)}">Amort.</button>` : ''}</div><div class="shk" data-for="${esc(key)}" hidden></div>`;
+        html += `<div class="kit"><span>${C.inchStr(k.inches)}" ${k.kind} · ${C.money(k.price)}${k.extra ? ' + ' + C.money(k.extra) : ''} → <b>${C.money(k.sale)}</b>${k.url && IT[k.url] ? ' · ⏱ ' + esc(IT[k.url]) : ''} · ${esc(k.title)}</span>${k.kind === 'lift' ? `<button data-shk="${esc(key)}">Amort.</button>` : ''}</div><div class="shk" data-for="${esc(key)}" hidden></div>`;
       });
       html += `</div>`;
     });
@@ -197,7 +202,8 @@
         desde: y[0] || '', hasta: y[1] && y[1] < 2100 ? y[1] : '',
         tipo: a.kind, pulgadas: a.inches,
         instalado: inst,
-        base: it.price, starting: !!it.starting, titulo: it.title, url: it.url || ''
+        base: it.price, starting: !!it.starting, titulo: it.title, url: it.url || '',
+        instala: (it.url && IT[it.url]) || ''
       });
     });
     return out;
@@ -212,11 +218,12 @@
       });
     } catch (e) { done({ ok: false, error: e.message }); }
   }
-  let savedCount = -1;
+  let savedSig = '';
   function saveKits() {
     const rows = kitRows();
-    if (!rows.length || rows.length === savedCount) return;
-    savedCount = rows.length;
+    const sig = rows.length + ':' + rows.filter(r => r.instala).length;
+    if (!rows.length || sig === savedSig) return;
+    savedSig = sig;
     $('#db').textContent = 'Guardando ' + rows.length + ' kits en la base de datos…';
     send({ kits: rows }, r => { $('#db').textContent = r.ok ? '✓ ' + r.saved + ' kits guardados en la base de datos' : 'No se guardó en la base de datos (' + r.error + ')'; });
   }
@@ -266,15 +273,56 @@
     return [...seen].map(([name, add]) => ({ name, add })).slice(0, 8);
   }
 
+  // ---------- tiempo de instalación (sale en la página de cada kit) ----------
+  // Se busca en segundo plano, de 2 en 2, primero los kits del bloque para copiar.
+  // Se guarda en el teléfono 30 días para no volver a abrir la misma página.
+  const IT = {};
+  let itCache = {};
+  try { itCache = GM_getValue('installTimes', {}) || {}; } catch (e) { itCache = {}; }
+  if (typeof itCache !== 'object' || Array.isArray(itCache)) itCache = {};
+  const DAY = 864e5;
+  Object.keys(itCache).forEach(u => { const c = itCache[u]; if (c && Date.now() - c.ts < 30 * DAY && c.t) IT[u] = c.t; });
+  function parseInstall(html) {
+    const txt = String(html).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+    const m = txt.match(/Est(?:imated)?\.?\s*Install(?:ation)?\s*Time\s*:?\s*([0-9][0-9.,\s\-–to]*\s*(?:\+\s*)?(?:hours?|hrs?|minutes?|mins?|days?))/i);
+    return m ? m[1].replace(/\s+/g, ' ').replace(/\s*-\s*/g, '-').trim() : '';
+  }
+  let itBusy = false;
+  async function loadInstallTimes() {
+    if (itBusy) return;
+    const q = { model, year: req.y || null, drive: st.drive, inches: st.inches, kind: st.kind, lang: st.lang };
+    const first = []; C.buildQuote(items, q).blocks.forEach(b => b.kits.forEach(k => k.url && first.push(k.url)));
+    const rest = kitRows().map(r => r.url).filter(Boolean);
+    const todo = [...new Set(first.concat(rest))].filter(u => !(u in IT));
+    if (!todo.length) return;
+    itBusy = true;
+    const worker = async () => {
+      while (todo.length) {
+        const u = todo.shift();
+        let t = '';
+        try { t = parseInstall(await fetch(u, { credentials: 'include' }).then(r => r.ok ? r.text() : '')); } catch (e) { t = ''; }
+        IT[u] = t;
+        itCache[u] = { t, ts: Date.now() };
+        render();
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    try { GM_setValue('installTimes', itCache); } catch (e) { }
+    itBusy = false;
+    saveKits();
+  }
+
   // ---------- arrancar ----------
   // La lista puede terminar de cargar después; se vuelve a leer unas veces si cambia.
   let lastCount = -1, tries = 0;
   async function run() {
     try { items = await readAll(); } catch (e) { items = []; }
     if (items.length !== lastCount) { lastCount = items.length; render(); }
-    if (tries >= 1) saveKits();
+    if (tries >= 1) { saveKits(); loadInstallTimes(); }
     if (++tries < 4) setTimeout(run, tries === 1 ? 1200 : 2500);
   }
+
+
   run();
 
   // aviso de versión nueva (prueba con Tampermonkey y, si no, con fetch normal)

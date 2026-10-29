@@ -31,7 +31,7 @@ function libro() { return SpreadsheetApp.getActive() || SpreadsheetApp.openById(
 
 const CAT = 'Catalog', BUS = 'Search', HIS = 'History', LIS = 'Lists';
 const HEAD = ['Make', 'Model', 'Drive', 'Year from', 'Year to', 'Type', 'Lift',
-  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Key'];
+  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Install time', 'Key'];
 const ROW0 = 4; // primera fila de datos en Catálogo
 const COLS = HEAD.length;
 
@@ -84,7 +84,7 @@ function armarCatalogo(sh) {
   banda(sh, 1, COLS, T.titulo, T.sub);
   sh.getRange(3, 1, 1, COLS).setValues([HEAD]);
   sh.setFrozenRows(3);
-  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 10];
+  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 120, 10];
   widths.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.hideColumns(COLS);
   formatoDatos(sh, ROW0, 300);
@@ -102,6 +102,7 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 10, n, 1).setHorizontalAlignment('center').setFontColor(T.muted);
   sh.getRange(r, 11, n, 1).setWrap(false);
   sh.getRange(r, 12, n, 1).setHorizontalAlignment('center');
+  sh.getRange(r, 14, n, 1).setHorizontalAlignment('center').setFontWeight('bold');
   sh.getRange(r, 13, n, 1).setNumberFormat('mm/dd/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
 }
 
@@ -249,10 +250,11 @@ function guardarKits(kits) {
   const ss = libro();
   const sh = ss.getSheetByName(CAT);
   if (!sh) throw new Error('Missing Catalog tab: run crearBaseDeDatos');
+  asegurarColumnas(sh);
   const last = sh.getLastRow();
-  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS, last - ROW0 + 1, 1).getValues().map(r => String(r[0])) : [];
-  const pos = {};
-  keys.forEach((k, i) => { if (k) pos[k] = ROW0 + i; });
+  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS - 1, last - ROW0 + 1, 2).getValues() : [];
+  const pos = {}, prevTime = {};
+  keys.forEach(([t, k], i) => { if (k) { pos[k] = ROW0 + i; prevTime[k] = t; } });
   const now = new Date();
   const nuevos = [];
   let n = 0;
@@ -261,7 +263,8 @@ function guardarKits(kits) {
     const row = [k.marca || '', k.modelo || '', (k.traccion === 'Todas' ? 'All' : (k.traccion || 'All')), k.desde || '', k.hasta || '',
       k.tipo === 'leveling' ? 'Leveling' : 'Lift', +k.pulgadas || '',
       +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
-      k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now, k.clave];
+      k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now,
+      k.instala || prevTime[k.clave] || '', k.clave];
     if (!k.clave) return;
     if (pos[k.clave]) sh.getRange(pos[k.clave], 1, 1, COLS).setValues([row]);
     else { nuevos.push(row); pos[k.clave] = -1; }
@@ -286,6 +289,21 @@ function guardarKits(kits) {
   }
   estiloCatalogo(sh);
   return n;
+}
+
+// Hojas creadas antes de la columna "Install time": la agrega antes de la clave sin perder datos
+function asegurarColumnas(sh) {
+  const head = sh.getRange(3, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  if (head.indexOf('Install time') >= 0) return;
+  const keyCol = head.indexOf('Key') + 1;
+  if (keyCol < 1) return;
+  if (sh.getFilter()) sh.getFilter().remove();
+  sh.insertColumnBefore(keyCol);
+  sh.getRange(3, keyCol).setValue('Install time');
+  sh.setColumnWidth(keyCol, 120);
+  sh.showColumns(keyCol);
+  sh.hideColumns(keyCol + 1);
+  SpreadsheetApp.flush();
 }
 
 function guardarHistorial(c) {
