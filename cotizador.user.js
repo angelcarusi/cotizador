@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.4.0
+// @version      1.4.1
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=10
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=11
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 7; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 8; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -190,7 +190,7 @@
       const a = C.analyzeTitle(it.title);
       if (!a.kind || a.inches == null) return;
       if (!model.match.test(it.title) || (model.not && model.not.test(it.title))) return;
-      const key = model.mk + '/' + model.md + '|' + (it.url || it.title.toLowerCase());
+      const key = model.mk + '/' + model.md + '|' + it.title.toLowerCase();
       if (seen.has(key)) return; seen.add(key);
       const inst = a.kind === 'leveling' ? C.levelPrice(it.price) : C.liftPrice(it.price);
       if (inst == null) return; // leveling de más de $200: no se guarda
@@ -283,6 +283,8 @@
   const DAY = 864e5;
   Object.keys(itCache).forEach(u => { const c = itCache[u]; if (c && Date.now() - c.ts < 30 * DAY && c.t) IT[u] = c.t; });
   function parseInstall(html) {
+    const j = String(html).match(/"pr_install_time"\s*:\s*"([^"]{1,40})"/i);
+    if (j && j[1].trim()) return j[1].replace(/\\u002F/gi, '/').trim();
     const txt = String(html).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
     const m = txt.match(/Est(?:imated)?\.?\s*Install(?:ation)?\s*Time\s*:?\s*([0-9][0-9.,\s\-–to]*\s*(?:\+\s*)?(?:hours?|hrs?|minutes?|mins?|days?))/i);
     return m ? m[1].replace(/\s+/g, ' ').replace(/\s*-\s*/g, '-').trim() : '';

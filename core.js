@@ -214,7 +214,13 @@
     const isPrice = t => /^\$\s*[\d,]+\.\d{2}$/.test(t);
     const kitWord = /lift kit|level/i;
     const junk = /reviews?\b|rating|out of 5|starting at|configurable|in stock|out of stock|add to cart|compare|^sale$|save \$|free shipping|ships |^\(?\d+\)?$|^new$|^best seller$|^[★☆✩✪\s]+$/i;
-    const productHrefs = el => new Set([...el.querySelectorAll('a[href]')].map(a => a.getAttribute('href')).filter(h => /\.html/i.test(h)).map(h => h.split('#')[0].split('?')[0]));
+    const isProd = h => /\.html|\/product\//i.test(h || '');
+    const productHrefs = el => {
+      const s = new Set([...el.querySelectorAll('a[href]')].map(a => a.getAttribute('href')).filter(isProd).map(h => h.split('#')[0].split('?')[0]));
+      const up = el.closest && el.closest('a[href]');
+      if (up && isProd(up.getAttribute('href'))) s.add(up.getAttribute('href').split('#')[0].split('?')[0]);
+      return s;
+    };
     // precio = elemento cuyo texto completo es "$559.95" (aunque venga partido en <span>)
     const priceEls = [];
     body.querySelectorAll('*').forEach(el => {
