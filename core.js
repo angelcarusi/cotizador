@@ -20,15 +20,18 @@
     { mk: 'ford', md: 'f-150-lightning', label: 'F-150 Lightning', alias: ['lightning', 'f150lightning'], match: /lightning/i },
     { mk: 'ford', md: 'f-250-super-duty', label: 'F-250 Super Duty', alias: ['f250', 'f250superduty', 'superduty250'], match: /f-?250|super ?duty/i },
     { mk: 'ford', md: 'f-350-super-duty', label: 'F-350 Super Duty', alias: ['f350', 'f350superduty', 'superduty350'], match: /f-?350|super ?duty/i },
+    { mk: 'ford', md: 'f-450-super-duty', label: 'F-450 Super Duty', alias: ['f450', 'f450superduty'], match: /f-?450|super ?duty/i },
     { mk: 'ford', md: 'ranger', label: 'Ranger', alias: ['fordranger', 'ranger'], match: /ranger/i },
     { mk: 'ford', md: 'bronco', label: 'Bronco', alias: ['bronco'], match: /bronco/i, not: /bronco sport/i },
     { mk: 'ford', md: 'expedition', label: 'Expedition', alias: ['expedition'], match: /expedition/i },
     { mk: 'chevy', md: 'silverado-1500', label: 'Silverado 1500', alias: ['silverado1500', 'silverado', 'chevy1500', 'chevrolet1500', 'cheyenne'], match: /silverado|chevy\s*\/\s*gmc[^|]*1500|\bgm\b[^|]*1500/i, not: /2500|3500|hd\b/i },
     { mk: 'chevy', md: 'silverado-2500-hd', label: 'Silverado 2500 HD', alias: ['silverado2500hd', 'silverado2500', 'chevy2500', 'chevrolet2500'], match: /2500/i },
+    { mk: 'chevy', md: 'silverado-3500-hd', label: 'Silverado 3500 HD', alias: ['silverado3500hd', 'silverado3500', 'chevy3500', 'chevrolet3500'], match: /3500/i },
     { mk: 'chevy', md: 'colorado', label: 'Colorado', alias: ['colorado'], match: /colorado/i },
     { mk: 'chevy', md: 'tahoe', label: 'Tahoe', alias: ['tahoe'], match: /tahoe|1500 (truck & )?suv/i },
     { mk: 'gmc', md: 'sierra-1500', label: 'Sierra 1500', alias: ['sierra1500', 'sierra', 'gmc1500'], match: /sierra|chevy\s*\/\s*gmc[^|]*1500|\bgm\b[^|]*1500/i, not: /2500|3500|hd\b/i },
     { mk: 'gmc', md: 'sierra-2500-hd', label: 'Sierra 2500 HD', alias: ['sierra2500hd', 'sierra2500', 'gmc2500'], match: /2500/i },
+    { mk: 'gmc', md: 'sierra-3500-hd', label: 'Sierra 3500 HD', alias: ['sierra3500hd', 'sierra3500', 'gmc3500'], match: /3500/i },
     { mk: 'gmc', md: 'canyon', label: 'Canyon', alias: ['canyon'], match: /canyon/i },
     { mk: 'gmc', md: 'yukon', label: 'Yukon', alias: ['yukon'], match: /yukon|1500 (truck & )?suv/i },
     { mk: 'ram', md: '1500', label: '1500', alias: ['ram1500', 'dodgeram1500', 'dodge1500'], match: /1500/i, not: /classic/i },
@@ -395,6 +398,16 @@
     return hits;
   }
 
+  // ---------- Dually (doble rueda atrás) ----------
+  const DUALLY_EXTRA = 200;
+  function hasDually(model, items) {
+    if (model && /(^|[^0-9])(350|450|3500|4500)([^0-9]|$)/.test(String(model.md) + ' ' + String(model.label))) return true;
+    return (items || []).some(it => /\bdually\b|\bdrw\b/i.test(it.title || ''));
+  }
+  function mentionsDually(msg) {
+    return /\bdual+(?:y|ie|i)s?\b|\bdrw\b|doble\s+rueda|ruedas?\s+dobles?|4\s+ruedas\s+(?:atr[aá]s|traseras)|cuatro\s+ruedas\s+(?:atr[aá]s|traseras)|dual\s+rear\s+wheel/i.test(String(msg || ''));
+  }
+
   // ---------- Armar la cotización ----------
   // items: [{title, price, url, starting}] ; q: {model, year, drive, inches, kind}
   function buildQuote(items, q) {
@@ -416,8 +429,9 @@
       pool.forEach(k => {
         const extra = +k.extra || 0;
         const base = k.price + extra;
-        const sale = k.kind === 'leveling' ? levelPrice(base) : liftPrice(base);
+        let sale = k.kind === 'leveling' ? levelPrice(base) : liftPrice(base);
         if (sale == null) return;
+        if (q.dually) sale += DUALLY_EXTRA;
         const key = k.kind + ':' + k.inches;
         const cur = best.get(key);
         // el más barato se elige por el precio base de Rough Country; los amortiguadores se suman después
@@ -446,7 +460,7 @@
     return { blocks, others, fitsCount: fits.length };
   }
 
-  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, fitmentNotes, fitmentAlerts, notePhrases, slugify, squash };
+  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, hasDually, mentionsDually, DUALLY_EXTRA, fitmentNotes, fitmentAlerts, notePhrases, slugify, squash };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Core = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

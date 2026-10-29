@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.5.0
+// @version      1.6.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=12
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=13
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 9; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 10; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -79,6 +79,10 @@
     .msg{color:#9aa3ab;font-size:13px;margin-top:8px}
     .warn{color:#ffa94d}
     .kits{font-size:12px;color:#9aa3ab;margin-top:6px}
+    #dually{margin-top:8px;background:#3d2a00;border:1px solid #f59f00;border-radius:10px;padding:8px 10px}
+    .dw{color:#ffd43b;font-weight:800;font-size:14px;letter-spacing:.3px}
+    .dl{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:#fff3bf;font-weight:600}
+    .dl input{width:20px;height:20px;accent-color:#f59f00}
     .alert{background:#3a0d0d;border:1px solid #e03131;color:#ff6b6b;font-weight:800;border-radius:10px;padding:8px 10px;margin:8px 0;font-size:14px}
     .alert span{display:block;font-weight:500;color:#ffc9c9;font-size:12px;margin-top:3px}
     .it{margin-top:8px;background:#14171a;border:1px solid #30363c;border-radius:10px;padding:8px 10px;font-size:13px;color:#c5ccd6}
@@ -100,6 +104,7 @@
     <div class="chips" id="lng"><button data-v="en">Inglés</button><button data-v="es">Español</button></div>
     <div class="chips"><input id="inch" inputmode="decimal" placeholder='Pulg.'><span id="kndBox"></span></div>
     <div class="chips"><input id="ver" placeholder="Versión del cliente (ZR2, Trail Boss, diesel…)" style="width:100%"></div>
+    <div id="dually" hidden><div class="dw">⚠ ESTE MODELO TIENE VERSIÓN DUALLY</div><label class="dl"><input type="checkbox" id="isDually"> Es dually (+$200 al precio final)</label></div>
     <div id="out"><div class="msg">Leyendo los kits de esta página…</div></div>
     <div class="msg" id="db"></div>
     <div class="msg" id="upd" hidden><a href="${APP}cotizador.user.js">Hay una versión nueva del script: toca aquí y luego Actualizar</a></div>
@@ -126,7 +131,10 @@
   if (st.inches != null) inch.value = C.inchStr(st.inches);
   const ver = $('#ver');
   ver.value = req.m || '';
-  ver.addEventListener('input', () => render());
+  let duallyTouched = false;
+  ver.addEventListener('input', () => { if (!duallyTouched) $('#isDually').checked = C.mentionsDually(ver.value); render(); });
+  $('#isDually').checked = C.mentionsDually(req.m || '');
+  $('#isDually').addEventListener('change', () => { duallyTouched = true; render(); });
   inch.addEventListener('input', () => { const v = parseFloat(inch.value.replace(',', '.')); st.inches = v > 0 && v <= 12 ? v : null; render(); });
   if (st.kind) $('#kndBox').innerHTML = `<button class="on" id="kndX">${st.kind === 'leveling' ? 'Solo leveling' : 'Solo lift'} ✕</button>`;
   root.addEventListener('click', e => { if (e.target.id === 'kndX') { st.kind = null; $('#kndBox').innerHTML = ''; render(); } });
@@ -157,7 +165,9 @@
       out.innerHTML = `<div class="msg warn">No encontré lift ni leveling kits en esta página. Si la página dice que no existe, revisa modelo y año en el cotizador.</div>`;
       return;
     }
-    const q = { model, year: req.y || null, drive: st.drive, inches: st.inches, kind: st.kind, lang: st.lang };
+    const canDually = C.hasDually(model, items);
+    $('#dually').hidden = !canDually;
+    const q = { model, year: req.y || null, drive: st.drive, inches: st.inches, kind: st.kind, lang: st.lang, dually: canDually && $('#isDually').checked };
     const res = C.buildQuote(items.map(it => Object.assign({}, it, { extra: extras[it.url || it.title] || 0 })), q);
     let html = '';
     res.blocks.forEach((b, bi) => {
@@ -185,7 +195,7 @@
       html += `<div class="it"><div class="itt">⏱ Tiempo de instalación aprox.</div>${times}</div><div class="kits">`;
       b.kits.forEach(k => {
         const key = k.url || k.title;
-        html += `<div class="kit"><span>${C.inchStr(k.inches)}" ${k.kind} · ${C.money(k.price)}${k.extra ? ' + ' + C.money(k.extra) : ''} → <b>${C.money(k.sale)}</b>${k.url && IT[k.url] ? ' · ⏱ ' + esc(IT[k.url]) : ''} · ${esc(k.title)}</span>${k.kind === 'lift' ? `<button data-shk="${esc(key)}">Amort.</button>` : ''}</div><div class="shk" data-for="${esc(key)}" hidden></div>`;
+        html += `<div class="kit"><span>${C.inchStr(k.inches)}" ${k.kind} · ${C.money(k.price)}${k.extra ? ' + ' + C.money(k.extra) : ''} → <b>${C.money(k.sale)}</b>${q.dually ? ' (dually +$200)' : ''}${k.url && IT[k.url] ? ' · ⏱ ' + esc(IT[k.url]) : ''} · ${esc(k.title)}</span>${k.kind === 'lift' ? `<button data-shk="${esc(key)}">Amort.</button>` : ''}</div><div class="shk" data-for="${esc(key)}" hidden></div>`;
       });
       html += `</div>`;
     });
