@@ -79,7 +79,6 @@ function armarCatalogo(sh) {
   banda(sh, 1, COLS, T.titulo, T.sub);
   sh.getRange(3, 1, 1, COLS).setValues([HEAD]);
   sh.setFrozenRows(3);
-  sh.setFrozenColumns(2);
   const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 10];
   widths.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.hideColumns(COLS);
