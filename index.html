@@ -152,7 +152,7 @@ details li{margin:3px 0}
 
 <div class="toast" id="toast"></div>
 
-<script src="core.js?v=1"></script>
+<script src="core.js?v=2"></script>
 <script>
 (function(){
 'use strict';
@@ -299,24 +299,88 @@ async function aiParse(msg){
 }
 
 // ---------- Puente / Rough Country ----------
-async function bridgeGet(url, raw){
-  if(!cfg.bridge) throw new Error('Falta el enlace del puente. Ponlo en Ajustes ⚙︎');
+// Hay tres caminos para leer Rough Country; la app recuerda el último que funcionó.
+//  lector: servicio r.jina.ai, directo desde el teléfono
+//  puente: tu Google Apps Script
+//  gemini: Gemini abre la página y devuelve la lista
+class NotFound extends Error {}
+async function viaBridge(url, raw){
+  if(!cfg.bridge) throw new Error('sin puente');
   const r = await fetch(cfg.bridge + '?url=' + encodeURIComponent(url) + (raw?'&raw=1':''));
   const j = await r.json().catch(()=>null);
-  if(!j) throw new Error('El puente no respondió bien. Revisa el enlace en Ajustes.');
-  if(!j.ok) throw new Error(j.status===404 ? 'Rough Country no tiene esa página (revisa modelo y año).' : (j.status ? 'Rough Country respondió '+j.status : (j.error||'Error del puente')));
+  if(!j) throw new Error('el puente no respondió bien');
+  if(j.status===404) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
+  if(!j.ok) throw new Error(j.status ? 'Rough Country respondió '+j.status+' al puente' : (j.error||'error del puente'));
   return j.html;
 }
+async function viaReader(url){
+  const r = await fetch('https://r.jina.ai/' + url, { headers: { 'X-Return-Format':'html', 'X-No-Cache':'true' } });
+  const t = await r.text();
+  if(r.status===404 || /\b404\b[^<]{0,80}not found|page not found/i.test(t.slice(0,4000)) && !/Filter Results/i.test(t)) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
+  if(!r.ok) throw new Error('el lector respondió '+r.status);
+  return t;
+}
+const looksBlocked = h => !h || h.length < 3000 || (/access denied|attention required|captcha|cf-error|request blocked|forbidden/i.test(h.slice(0,6000)) && !/Filter Results|Starting at/i.test(h));
 const parseDoc = html => new DOMParser().parseFromString(html, 'text/html');
+const htmlRoutes = { lector: viaReader, puente: viaBridge };
+function routeOrder(){
+  const all = ['lector','puente','gemini'].filter(r => (r!=='puente'||cfg.bridge) && (r!=='gemini'||cfg.key));
+  if(cfg.route && all.includes(cfg.route)) all.unshift(...all.splice(all.indexOf(cfg.route),1));
+  return all;
+}
+function useRoute(r){ if(cfg.route!==r){ cfg.route=r; saveCfg(); } }
 
-async function loadListing(url){
-  const first = C.parseListing(parseDoc(await bridgeGet(url)));
-  let items = first.items;
-  if(first.pages.length){
-    const extra = await Promise.all(first.pages.slice(0,5).map(p => bridgeGet(p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
-    extra.forEach(x => items = items.concat(x));
+async function getHtml(url, raw){
+  const errs=[];
+  for(const r of routeOrder().filter(x=>htmlRoutes[x])){
+    try{
+      const h = await htmlRoutes[r](url, raw);
+      if(looksBlocked(h)) { errs.push(r+': bloqueado'); continue; }
+      return h;
+    }catch(e){ if(e instanceof NotFound) throw e; errs.push(r+': '+e.message); }
   }
-  return items;
+  throw new Error('No pude abrir la página de Rough Country ('+errs.join('; ')+').');
+}
+
+async function viaGemini(url){
+  const prompt = `Open this page: ${url}
+List every product shown in the product results grid. For each one give the full product name exactly as written on the page (keep the " | " separators, the drive type and the years), the price as a number, and starting=true if the price says "Starting at".
+Reply ONLY with a JSON array, no other text, like:
+[{"title":"6 Inch Lift Kit | Ford F-150 4WD (2021-2026)","price":1399.95,"starting":true}]
+If the page cannot be opened, reply [].`;
+  const { text } = await geminiAny('chat', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } });
+  const m = text.match(/\[[\s\S]*\]/);
+  let arr=[]; try{ arr = m ? JSON.parse(m[0]) : []; }catch(e){ arr=[]; }
+  return arr.filter(x => x && typeof x.title==='string' && +x.price>0).map(x => ({ title: x.title.replace(/\s+/g,' ').trim(), price: +x.price, starting: !!x.starting, url: null }));
+}
+
+let lastRoute = '';
+async function loadListing(url){
+  const errs=[];
+  for(const r of routeOrder()){
+    try{
+      let items;
+      if(r==='gemini') items = await viaGemini(url);
+      else {
+        const html = await htmlRoutes[r](url);
+        if(looksBlocked(html)) { errs.push(r+': bloqueado'); continue; }
+        const first = C.parseListing(parseDoc(html));
+        items = first.items;
+        if(!items.length && !/Filter Results|lift kit/i.test(html)) { errs.push(r+': sin productos'); continue; }
+        if(first.pages.length){
+          const extra = await Promise.all(first.pages.slice(0,5).map(p => htmlRoutes[r](p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
+          extra.forEach(x => items = items.concat(x));
+        }
+      }
+      if(!items.length && r!==routeOrder().slice(-1)[0]) { errs.push(r+': 0 kits'); continue; }
+      useRoute(r); lastRoute = r;
+      return items;
+    }catch(e){
+      if(e instanceof NotFound) throw e;
+      errs.push(r+': '+e.message);
+    }
+  }
+  throw new Error('No pude leer Rough Country ('+errs.join('; ')+').');
 }
 
 // ---------- Cotizar ----------
@@ -350,7 +414,7 @@ async function search(){
     if(id!==runId) return;
     LS.set('c:'+url, { ts: Date.now(), items });
     render(q, items);
-    status(items.length ? 'Precios al día · ' + vehicleName(q) : 'Rough Country no muestra kits para ese vehículo y año.', !items.length);
+    status(items.length ? 'Precios al día · ' + vehicleName(q) + ' · vía ' + lastRoute : 'Rough Country no muestra kits para ese vehículo y año.', !items.length);
   }catch(e){
     if(id!==runId) return;
     status((cached ? 'No pude actualizar, uso los precios guardados. ' : '') + e.message, true);
@@ -421,7 +485,7 @@ async function shocks(card, key, url){
   wireManual(box, key);
   if(!url) { box.querySelector('.help').textContent='Escribe el precio extra del amortiguador:'; return; }
   try{
-    const doc = parseDoc(await bridgeGet(url, true));
+    const doc = parseDoc(await getHtml(url, true));
     const opts = shockOptions(doc);
     if(!opts.length){ box.querySelector('.help').textContent='No encontré las opciones en la página. Escribe el precio extra:'; return; }
     box.innerHTML = '<div class="chips">' + [{name:'Básico (incluido)', add:0}].concat(opts).map(o=>`<button data-add="${o.add}" class="${Math.abs(o.add-cur)<.01?'on':''}">${esc(o.name)}${o.add?' +'+C.money(o.add):''}</button>`).join('') + '</div>' + manual;
@@ -539,8 +603,8 @@ $('#test').onclick = async () => {
   const lines=[];
   try{
     const items = await loadListing('https://www.roughcountry.com/lift-kits/ford/f-150/2024');
-    lines.push(items.length ? `✓ Puente y Rough Country: ${items.length} kits leídos de la F-150 2024.` : '✗ El puente funciona pero no leí kits de Rough Country.');
-  }catch(e){ lines.push('✗ Puente: '+e.message); }
+    lines.push(items.length ? `✓ Rough Country: ${items.length} kits leídos de la F-150 2024 (vía ${lastRoute}).` : '✗ Abrí la página pero no leí kits de Rough Country.');
+  }catch(e){ lines.push('✗ '+e.message); }
   if(cfg.key){
     try{ await geminiAny('parse', { contents:[{role:'user',parts:[{text:'Reply with the word OK'}]}] }); lines.push('✓ Gemini funciona ('+cfg.parseModel+').'); }
     catch(e){ lines.push('✗ Gemini: '+e.message); }
@@ -550,7 +614,7 @@ $('#test').onclick = async () => {
 
 // inicio
 drawChat();
-if(!cfg.bridge) show('S');
+if(!cfg.bridge && !cfg.key && !LS.get('seen',0)) { LS.set('seen',1); show('S'); }
 })();
 </script>
 </body>
