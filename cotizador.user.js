@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.1.0
+// @version      1.2.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=7
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=8
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @connect      angelcarusi.github.io
@@ -19,7 +19,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 2; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 3; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -150,6 +150,12 @@
         const sizes = [...new Set(b.sizes.map(k => (k.kind === 'leveling' ? 'leveling ' : 'lift ') + C.inchStr(k.inches) + '"'))];
         html += `<div class="msg">No hay ${st.inches != null || st.kind ? 'ese kit' : 'kits'} para esta tracción.${sizes.length ? ' Disponibles: ' + esc(sizes.join(', ')) + '.' : ''}</div>`;
         return;
+      }
+      if (b.nearest) {
+        const n = b.nearest, parts = [];
+        if (n.lower != null) parts.push(C.inchStr(n.lower) + '" (menor)');
+        if (n.higher != null) parts.push(C.inchStr(n.higher) + '" (mayor)');
+        html += `<div class="msg warn">No hay ${C.inchStr(n.asked)}" para este vehículo. Te pongo ${parts.length > 1 ? 'los más cercanos' : 'el más cercano'}: ${parts.join(' y ')}.</div>`;
       }
       html += `<pre>${esc(b.text)}</pre><button class="copy" data-b="${bi}">Copiar</button><div class="kits">`;
       b.kits.forEach(k => {

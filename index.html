@@ -71,6 +71,10 @@ details li{margin:3px 0}
 .msg .cp{display:block;margin-top:6px;font-size:12px;color:var(--muted);background:none;border:0;padding:0}
 .help{font-size:13px;color:var(--muted)}
 .help ol{padding-left:18px}
+.ip h4{margin:10px 0 3px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.ip p,.ip li{margin:2px 0;font-size:15px}
+.ip ul{margin:0;padding-left:18px}
+.ip .reply{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:14px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -119,6 +123,15 @@ details li{margin:3px 0}
       <button class="btn main" id="send">Enviar</button>
     </div>
   </div>
+  <div class="card">
+    <label class="f" for="interp">Interpretar mensaje del cliente</label>
+    <textarea id="interp" placeholder="Pega aquí un mensaje confuso o muy técnico y te digo qué quiere el cliente"></textarea>
+    <div class="row">
+      <button class="btn" id="interpPaste">Pegar</button>
+      <button class="btn main" id="interpGo">Interpretar</button>
+    </div>
+    <div id="interpOut" style="margin-top:10px"></div>
+  </div>
 </main>
 
 <!-- ============ AJUSTES ============ -->
@@ -157,7 +170,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='7';
+  var V='8';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -167,7 +180,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=7"></script>
+<script src="core.js?v=8"></script>
 <script>
 (function(){
 'use strict';
@@ -416,6 +429,43 @@ $('#send').onclick = async () => {
   }catch(e){ chat.push({ role:'model', text:'Error: '+e.message }); }
   LS.set('chat', chat.slice(-40)); drawChat();
 };
+
+// ---------- Intérprete de mensajes ----------
+const INTERP_SYS = `Eres un experto en camionetas, suspensión, lift kits, leveling kits, llantas y rines, y ayudas a un vendedor de "Cheap on Tires" (taller en EE. UU. que vende e instala kits de Rough Country, llantas y rines).
+Te pegan el mensaje de un cliente que puede ser confuso, muy técnico, con jerga, abreviaturas o errores. Explica en español, claro y corto, qué quiere exactamente el cliente.
+Responde SOLO con JSON con estas claves:
+{"quiere":"una o dos frases con lo que pide","vehiculo":"marca, modelo, año, tracción y versión si se sabe; si no, di qué falta","detalles":["cada término técnico o requisito explicado en palabras simples"],"preguntar":["datos que faltan para cotizar o hacer bien el trabajo"],"respuesta":"respuesta corta sugerida para enviarle al cliente, en el MISMO idioma que usó el cliente","cotizable":true o false (true si pide un lift o leveling kit)}`;
+let lastInterpMsg = '';
+$('#interpPaste').onclick = async () => {
+  try{ const t = await navigator.clipboard.readText(); if(t){ $('#interp').value=t; interpret(); return; } }catch(e){}
+  $('#interp').focus(); toast('Mantén presionado y elige Pegar');
+};
+$('#interpGo').onclick = () => interpret();
+async function interpret(){
+  const msg = $('#interp').value.trim(); if(!msg) return;
+  if(!cfg.key){ toast('Agrega la clave de Gemini en Ajustes'); return; }
+  lastInterpMsg = msg;
+  const out = $('#interpOut'); out.innerHTML = '<div class="help">Interpretando…</div>';
+  try{
+    const { text } = await geminiAny('chat', {
+      systemInstruction: { parts:[{ text: INTERP_SYS }] },
+      contents: [{ role:'user', parts:[{ text: msg.slice(0,4000) }] }],
+      generationConfig: { responseMimeType:'application/json', temperature:.2 }
+    });
+    let j; try{ j = JSON.parse(text.replace(/^```(?:json)?|```$/g,'').trim()); }catch(e){ out.innerHTML = '<div class="ip"><p>'+esc(text)+'</p></div>'; return; }
+    const list = a => Array.isArray(a) && a.length ? '<ul>'+a.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>' : '<p>—</p>';
+    out.innerHTML = `<div class="ip">
+      <h4>Qué quiere</h4><p>${esc(j.quiere||'—')}</p>
+      <h4>Vehículo</h4><p>${esc(j.vehiculo||'—')}</p>
+      <h4>Explicación</h4>${list(j.detalles)}
+      <h4>Falta preguntar</h4>${list(j.preguntar)}
+      <h4>Respuesta sugerida</h4><div class="reply">${esc(j.respuesta||'')}</div>
+      <div class="row"><button class="btn" id="ipCopy">Copiar respuesta</button>${j.cotizable?'<button class="btn main" id="ipQuote">Cotizar</button>':''}</div>
+    </div>`;
+    $('#ipCopy').onclick = () => copyPlain(j.respuesta||'');
+    if(j.cotizable) $('#ipQuote').onclick = () => { $('#msg').value = lastInterpMsg; show('Q'); go(); };
+  }catch(e){ out.innerHTML = '<div class="help">Error: '+esc(e.message)+'</div>'; }
+}
 
 // ---------- Ajustes ----------
 function fillSettings(){

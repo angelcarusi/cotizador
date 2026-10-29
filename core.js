@@ -93,13 +93,19 @@
       if (y2) out.year = +y2[1] < 50 ? 2000 + +y2[1] : 1900 + +y2[1];
     }
 
-    if (/\b4\s*x\s*4\b|\b4\s*wd\b|four[\s-]*wheel|\bawd\b|\b4\s*x\s*4s\b/.test(low)) out.drive = '4WD';
-    else if (/\b4\s*x\s*2\b|\b2\s*wd\b|\brwd\b|\b2\s*x\s*4\b|two[\s-]*wheel|\btracci[oó]n trasera\b/.test(low)) out.drive = '2WD';
+    // tracción: 4WD / AWD / 4x4 → 4x4 ; 2WD / RWD / 4x2 → 4x2 (acepta 4×4, 4-wd, "4 wheel drive", "4 por 4"…)
+    const dl = low.replace(/[×✕✖*]/g, 'x');
+    const is4 = /\b4\s*-?\s*x\s*-?\s*4s?\b|\b4\s*-?\s*w\.?\s*d\b|\ba\.?\s*w\.?\s*d\b|\b(?:4|four)[\s-]*wheel|all[\s-]*wheel|\b4\s*por\s*4\b|\b4\s*by\s*4\b|doble\s+tracci|\b4x4s?\b|\b4wd\b/;
+    const is2 = /\b4\s*-?\s*x\s*-?\s*2\b|\b2\s*-?\s*w\.?\s*d\b|\br\.?\s*w\.?\s*d\b|\b(?:2|two)[\s-]*wheel|rear[\s-]*wheel|\b4\s*por\s*2\b|\b2\s*x\s*4\b|tracci[oó]n\s+(?:trasera|sencilla|simple)|\b4x2\b|\b2wd\b/;
+    const has4 = is4.test(dl), has2 = is2.test(dl);
+    if (has4 && !has2) out.drive = '4WD';
+    else if (has2 && !has4) out.drive = '2WD';
 
-    const inch = raw.match(/(\d+(?:[.,]\d+)?)\s*(?:"|”|''|′′|in\b|inch(?:es)?\b|pulg(?:adas?)?\b|pulgada\b)/i);
-    if (inch) {
-      const v = parseFloat(inch[1].replace(',', '.'));
-      if (v > 0 && v <= 12) out.inches = v;
+    const reIn = /(\d+(?:[.,]\d+)?)\s*(?:"|”|''|′′|in\b|inch(?:es)?\b|pulg(?:adas?)?\b|pulgada\b)/gi;
+    let mi;
+    while ((mi = reIn.exec(raw))) {
+      const v = parseFloat(mi[1].replace(',', '.'));
+      if (v > 0 && v <= 12) { out.inches = v; break; } // 33", 35" son llantas, no lift
     }
 
     if (/level/i.test(low)) out.kind = 'leveling';
@@ -374,9 +380,22 @@
       let list = Array.from(best.values());
       const sizes = list.slice();
       if (q.kind) list = list.filter(k => k.kind === q.kind);
-      if (q.inches != null) list = list.filter(k => Math.abs(k.inches - q.inches) < 0.01);
+      let nearest = null;
+      if (q.inches != null) {
+        const exact = list.filter(k => Math.abs(k.inches - q.inches) < 0.01);
+        if (exact.length || !list.length) list = exact;
+        else {
+          // no existe esa medida: la más cercana por debajo y por encima
+          const below = list.filter(k => k.inches < q.inches).map(k => k.inches);
+          const above = list.filter(k => k.inches > q.inches).map(k => k.inches);
+          const lo = below.length ? Math.max(...below) : null;
+          const hi = above.length ? Math.min(...above) : null;
+          list = list.filter(k => k.inches === lo || k.inches === hi);
+          nearest = { asked: q.inches, lower: lo, higher: hi };
+        }
+      }
       list.sort((a, b) => (a.kind === b.kind ? a.inches - b.inches : (a.kind === 'leveling' ? -1 : 1)));
-      return { drive, kits: list, sizes, text: list.map(k => lineFor(k, q.lang)).join('\n\n') };
+      return { drive, kits: list, sizes, nearest, text: list.map(k => lineFor(k, q.lang)).join('\n\n') };
     });
     return { blocks, others, fitsCount: fits.length };
   }
