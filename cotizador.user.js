@@ -1,14 +1,18 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.2.1
+// @version      1.3.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=8
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=9
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @connect      angelcarusi.github.io
+// @connect      script.google.com
+// @connect      script.googleusercontent.com
 // @run-at       document-idle
 // @updateURL    https://angelcarusi.github.io/cotizador/cotizador.user.js
 // @downloadURL  https://angelcarusi.github.io/cotizador/cotizador.user.js
@@ -19,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 4; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 5; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -39,6 +43,8 @@
     return req;
   }
   const req = readRequest();
+  let SHEET = '';
+  try { if (req.s) GM_setValue('sheet', req.s); SHEET = req.s || GM_getValue('sheet', '') || ''; } catch (e) { SHEET = req.s || ''; }
   if (!req.mk || !req.md) return; // no es una página de vehículo
 
   const model = C.resolveModel(req.mk, req.md);
@@ -89,6 +95,7 @@
     <div class="chips" id="lng"><button data-v="en">Inglés</button><button data-v="es">Español</button></div>
     <div class="chips"><input id="inch" inputmode="decimal" placeholder='Pulg.'><span id="kndBox"></span></div>
     <div id="out"><div class="msg">Leyendo los kits de esta página…</div></div>
+    <div class="msg" id="db"></div>
     <div class="msg" id="upd" hidden><a href="${APP}cotizador.user.js">Hay una versión nueva del script: toca aquí y luego Actualizar</a></div>
     <div class="msg"><a href="${APP}">← Volver al cotizador</a></div>
   </div>
@@ -170,7 +177,50 @@
     out.querySelectorAll('[data-shk]').forEach(btn => btn.onclick = () => shocks(btn.dataset.shk));
   }
 
+  // ---------- base de datos (Google Sheet) ----------
+  function kitRows() {
+    const out = [];
+    const seen = new Set();
+    items.forEach(it => {
+      const a = C.analyzeTitle(it.title);
+      if (!a.kind || a.inches == null) return;
+      if (!model.match.test(it.title) || (model.not && model.not.test(it.title))) return;
+      const key = model.mk + '/' + model.md + '|' + (it.url || it.title.toLowerCase());
+      if (seen.has(key)) return; seen.add(key);
+      const d = a.drives ? [...a.drives] : [];
+      const y = a.years[0] || [];
+      out.push({
+        clave: key, marca: C.makeLabel(model.mk), modelo: model.label,
+        traccion: d.length === 1 ? (d[0] === '4WD' ? '4x4' : '4x2') : (d.length > 1 ? '4x2 / 4x4' : 'Todas'),
+        desde: y[0] || '', hasta: y[1] && y[1] < 2100 ? y[1] : '',
+        tipo: a.kind, pulgadas: a.inches,
+        instalado: a.kind === 'leveling' ? C.levelPrice(it.price) : C.liftPrice(it.price),
+        base: it.price, starting: !!it.starting, titulo: it.title, url: it.url || ''
+      });
+    });
+    return out;
+  }
+  function send(payload, done) {
+    if (!SHEET) { $('#db').innerHTML = 'Base de datos: agrega su enlace en <a href="' + APP + '">Ajustes del cotizador</a>.'; return; }
+    try {
+      GM_xmlhttpRequest({
+        method: 'POST', url: SHEET, data: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        onload: r => { let j = null; try { j = JSON.parse(r.responseText); } catch (e) { } done(j && j.ok ? j : { ok: false, error: j ? j.error : 'respuesta ' + r.status }); },
+        onerror: () => done({ ok: false, error: 'sin conexión' })
+      });
+    } catch (e) { done({ ok: false, error: e.message }); }
+  }
+  let savedCount = -1;
+  function saveKits() {
+    const rows = kitRows();
+    if (!rows.length || rows.length === savedCount) return;
+    savedCount = rows.length;
+    $('#db').textContent = 'Guardando ' + rows.length + ' kits en la base de datos…';
+    send({ kits: rows }, r => { $('#db').textContent = r.ok ? '✓ ' + r.saved + ' kits guardados en la base de datos' : 'No se guardó en la base de datos (' + r.error + ')'; });
+  }
+
   function copy(text) {
+    send({ copy: { vehiculo: $('#ttl').textContent, mensaje: req.m || '', texto: text } }, () => { });
     try { GM_setClipboard(text, 'text'); toast('Copiado'); return; } catch (e) { }
     navigator.clipboard.writeText(text).then(() => toast('Copiado'), () => toast('Mantén presionado el texto para copiar'));
   }
@@ -220,6 +270,7 @@
   async function run() {
     try { items = await readAll(); } catch (e) { items = []; }
     if (items.length !== lastCount) { lastCount = items.length; render(); }
+    if (tries >= 1) saveKits();
     if (++tries < 4) setTimeout(run, tries === 1 ? 1200 : 2500);
   }
   run();

@@ -137,6 +137,9 @@ details li{margin:3px 0}
 <!-- ============ AJUSTES ============ -->
 <main id="viewS" hidden>
   <div class="card">
+    <label class="f" for="sSheet">Enlace de la base de datos (Google Sheet · termina en /exec)</label>
+    <input id="sSheet" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <div style="height:10px"></div>
     <label class="f" for="sKey">Clave de Gemini (API key)</label>
     <input id="sKey" placeholder="AIza…" autocomplete="off">
     <div style="height:10px"></div>
@@ -170,7 +173,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='8';
+  var V='9';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -180,7 +183,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=8"></script>
+<script src="core.js?v=9"></script>
 <script>
 (function(){
 'use strict';
@@ -343,7 +346,7 @@ async function aiParse(msg){
 // y el script de Tampermonkey calcula la cotización encima.
 let lastMsg = '';
 function rcUrl(q){
-  const data = { mk:q.model.mk, md:q.model.md, label:q.model.label, y:q.year, d:q.drive, i:q.inches, k:q.kind, l:q.lang };
+  const data = { mk:q.model.mk, md:q.model.md, label:q.model.label, y:q.year, d:q.drive, i:q.inches, k:q.kind, l:q.lang, s:cfg.sheet||'', m:(lastMsg||'').slice(0,400) };
   return `https://www.roughcountry.com/lift-kits/${q.model.mk}/${q.model.md}/${q.year}#cot=${encodeURIComponent(JSON.stringify(data))}`;
 }
 function check(){
@@ -469,11 +472,11 @@ async function interpret(){
 
 // ---------- Ajustes ----------
 function fillSettings(){
-  $('#sKey').value=cfg.key;
+  $('#sKey').value=cfg.key; $('#sSheet').value=cfg.sheet||'';
   $('#sPm').value=cfg.parseModel; $('#sCm').value=cfg.chatModel; web.set(cfg.web?'1':'0');
 }
 function readSettings(){
-  cfg.key=$('#sKey').value.trim();
+  cfg.key=$('#sKey').value.trim(); cfg.sheet=$('#sSheet').value.trim();
   cfg.parseModel=$('#sPm').value.trim()||DEF.parseModel; cfg.chatModel=$('#sCm').value.trim()||DEF.chatModel;
   cfg.web = web.get()!=='0';
 }
