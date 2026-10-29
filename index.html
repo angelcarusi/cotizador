@@ -152,7 +152,20 @@ details li{margin:3px 0}
 
 <div class="toast" id="toast"></div>
 
-<script src="core.js?v=2"></script>
+<script>
+// Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
+(function(){
+  var V='3';
+  try{
+    fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
+      t=(t||'').trim();
+      if(t && t!==V && !/[?&]v=/.test(location.search+'') ){ location.replace(location.pathname+'?v='+t); }
+      else if(t && t!==V && location.search.indexOf('v='+t)<0){ location.replace(location.pathname+'?v='+t); }
+    }).catch(function(){});
+  }catch(e){}
+})();
+</script>
+<script src="core.js?v=3"></script>
 <script>
 (function(){
 'use strict';
