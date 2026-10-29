@@ -92,7 +92,7 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 4, n, 2).setNumberFormat('0').setHorizontalAlignment('center');
   sh.getRange(r, 3, n, 1).setHorizontalAlignment('center');
   sh.getRange(r, 6, n, 1).setHorizontalAlignment('center').setFontWeight('bold');
-  sh.getRange(r, 7, n, 1).setNumberFormat('0.##"\\""').setHorizontalAlignment('center');
+  sh.getRange(r, 7, n, 1).setNumberFormat('0.##"″"').setHorizontalAlignment('center');
   sh.getRange(r, 8, n, 1).setNumberFormat('$#,##0').setFontWeight('bold').setHorizontalAlignment('right');
   sh.getRange(r, 9, n, 1).setNumberFormat('$#,##0.00').setFontColor(T.muted).setHorizontalAlignment('right');
   sh.getRange(r, 10, n, 1).setHorizontalAlignment('center').setFontColor(T.muted);
@@ -174,7 +174,7 @@ function armarBuscar(sh) {
     `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No hay kits guardados para ese vehículo y año"))`);
   sh.getRange('B11:G200').setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
   sh.getRange('B11:C200').setHorizontalAlignment('center');
-  sh.getRange('C11:C200').setNumberFormat('0.##"\\""');
+  sh.getRange('C11:C200').setNumberFormat('0.##"″"');
   sh.getRange('D11:D200').setNumberFormat('$#,##0').setFontWeight('bold').setFontColor(T.accent).setHorizontalAlignment('right');
   sh.getRange('E11:E200').setNumberFormat('$#,##0.00').setFontColor(T.muted).setHorizontalAlignment('right');
   sh.getRange('G11:G200').setHorizontalAlignment('center').setFontColor(T.muted);
