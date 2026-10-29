@@ -155,7 +155,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='3';
+  var V='4';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -165,7 +165,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=3"></script>
+<script src="core.js?v=4"></script>
 <script>
 (function(){
 'use strict';
@@ -259,19 +259,24 @@ async function gemini(model, body){
 }
 async function geminiAny(kind, body){
   const pref = kind==='parse'
-    ? [cfg.parseModel,'gemini-3.5-flash-lite','gemini-flash-lite-latest','gemini-3.8-flash','gemini-flash-latest']
-    : [cfg.chatModel,'gemini-3.8-flash','gemini-flash-latest','gemini-3.6-flash','gemini-3.5-flash-lite'];
+    ? [cfg.parseModel,'gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-flash-lite-latest','gemini-3.6-flash','gemini-3.8-flash']
+    : kind==='fetch'
+    ? [cfg.chatModel,'gemini-3.6-flash','gemini-3.8-flash','gemini-flash-latest','gemini-3.5-flash-lite']
+    : [cfg.chatModel,'gemini-3.8-flash','gemini-3.6-flash','gemini-flash-latest','gemini-3.5-flash-lite'];
   const list = pref.filter((m,i)=>m && pref.indexOf(m)===i);
   let last;
   for(const m of list){
     try{
-      const out = await gemini(m, body);
-      if(kind==='parse' && m!==cfg.parseModel){ cfg.parseModel=m; saveCfg(); }
-      if(kind==='chat' && m!==cfg.chatModel){ cfg.chatModel=m; saveCfg(); }
-      return out;
+      return await gemini(m, body);
     }catch(e){
       last=e;
-      if(e.status===404 || /not found|not supported|is not available|deprecated/i.test(e.message)) continue;
+      const gone = e.status===404 || /not found|not supported|is not available|deprecated/i.test(e.message);
+      const busy = e.status===429 || e.status===500 || e.status===503 || /high demand|overloaded|try again|unavailable|exhausted|quota/i.test(e.message);
+      if(gone){
+        if(kind==='parse' && m===cfg.parseModel){ cfg.parseModel=''; }
+        if(kind==='chat' && m===cfg.chatModel){ cfg.chatModel=''; }
+      }
+      if(gone || busy) continue;
       throw e;
     }
   }
@@ -311,13 +316,24 @@ async function aiParse(msg){
   };
 }
 
-// ---------- Puente / Rough Country ----------
-// Hay tres caminos para leer Rough Country; la app recuerda el último que funcionó.
-//  lector: servicio r.jina.ai, directo desde el teléfono
+// ---------- Leer Rough Country ----------
+// Tres caminos; la app recuerda el último que funcionó.
+//  lector: servicio r.jina.ai, directo desde el teléfono (HTML y, si no, texto)
 //  puente: tu Google Apps Script
 //  gemini: Gemini abre la página y devuelve la lista
 class NotFound extends Error {}
-async function viaBridge(url, raw){
+const diag = {};
+const parseDoc = html => new DOMParser().parseFromString(html, 'text/html');
+const blockedText = t => /access denied|attention required|captcha|cf-error|request blocked|forbidden|are you a robot|verify you are human|unusual traffic|pardon our interruption|incapsula|perimeterx|px-captcha/i.test(String(t).slice(0,8000));
+const notFoundText = t => /page not found|404 not found|we can.?t find|couldn.?t find the page/i.test(String(t).slice(0,8000)) && !/Filter Results/i.test(t);
+function sniff(route, status, body){
+  const t = String(body||'');
+  const title = (t.match(/<title[^>]*>([^<]*)<\/title>/i)||t.match(/^Title:\s*(.*)$/m)||[,''])[1].trim();
+  const text = t.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  diag[route] = `HTTP ${status} · ${t.length} car. · título: "${title.slice(0,70)}" · "${text.slice(0,140)}"`;
+}
+
+async function bridgeHtml(url, raw){
   if(!cfg.bridge) throw new Error('sin puente');
   const r = await fetch(cfg.bridge + '?url=' + encodeURIComponent(url) + (raw?'&raw=1':''));
   const j = await r.json().catch(()=>null);
@@ -326,45 +342,68 @@ async function viaBridge(url, raw){
   if(!j.ok) throw new Error(j.status ? 'Rough Country respondió '+j.status+' al puente' : (j.error||'error del puente'));
   return j.html;
 }
-async function viaReader(url){
-  const r = await fetch('https://r.jina.ai/' + url, { headers: { 'X-Return-Format':'html', 'X-No-Cache':'true' } });
+async function readerGet(url, format){
+  const h = { 'X-No-Cache':'true' };
+  if(format) h['X-Return-Format'] = format;
+  const r = await fetch('https://r.jina.ai/' + url, { headers: h });
   const t = await r.text();
-  if(r.status===404 || /\b404\b[^<]{0,80}not found|page not found/i.test(t.slice(0,4000)) && !/Filter Results/i.test(t)) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
-  if(!r.ok) throw new Error('el lector respondió '+r.status);
+  sniff('lector'+(format?'-'+format:''), r.status, t);
+  if(r.status===404 || notFoundText(t)) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
+  if(!r.ok) throw new Error('respondió '+r.status);
+  if(blockedText(t) && !/Starting at|Filter Results/i.test(t)) throw new Error('Rough Country lo bloqueó');
   return t;
 }
-const looksBlocked = h => !h || h.length < 3000 || (/access denied|attention required|captcha|cf-error|request blocked|forbidden/i.test(h.slice(0,6000)) && !/Filter Results|Starting at/i.test(h));
-const parseDoc = html => new DOMParser().parseFromString(html, 'text/html');
-const htmlRoutes = { lector: viaReader, puente: viaBridge };
+
+async function itemsFromHtmlRoute(get, url){
+  const html = await get(url);
+  const first = C.parseListing(parseDoc(html));
+  let items = first.items;
+  if(first.pages.length){
+    const extra = await Promise.all(first.pages.slice(0,5).map(p => get(p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
+    extra.forEach(x => items = items.concat(x));
+  }
+  return { items, html };
+}
+
+const ROUTES = {
+  async lector(url){
+    let errs = [];
+    try{
+      const { items, html } = await itemsFromHtmlRoute(u => readerGet(u, 'html'), url);
+      if(items.length || /Filter Results:\s*0\b/i.test(html)) return items;
+      errs.push('html sin productos');
+    }catch(e){ if(e instanceof NotFound) throw e; errs.push('html: '+e.message); }
+    const md = await readerGet(url, '');
+    const items = C.parseText(md);
+    if(items.length) return items;
+    throw new Error(errs.concat('texto sin productos').join(', '));
+  },
+  async puente(url){
+    const { items, html } = await itemsFromHtmlRoute(u => bridgeHtml(u), url);
+    sniff('puente', 200, html);
+    if(!items.length && !/Filter Results/i.test(html)) throw new Error('sin productos');
+    return items;
+  },
+  async gemini(url){
+    const prompt = `Open this page: ${url}
+List every product shown in the product results grid. For each one give the full product name exactly as written on the page (keep the " | " separators, the drive type and the years), the price as a number, and starting=true if the price says "Starting at".
+Reply ONLY with a JSON array, no other text, like:
+[{"title":"6 Inch Lift Kit | Ford F-150 4WD (2021-2026)","price":1399.95,"starting":true}]
+If the page cannot be opened, reply exactly: BLOCKED`;
+    const { text } = await geminiAny('fetch', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } });
+    diag.gemini = text.slice(0,160).replace(/\s+/g,' ');
+    if(/^\s*BLOCKED/i.test(text)) throw new Error('no pudo abrir la página');
+    const m = text.match(/\[[\s\S]*\]/);
+    let arr=[]; try{ arr = m ? JSON.parse(m[0]) : []; }catch(e){ arr=[]; }
+    const items = arr.filter(x => x && typeof x.title==='string' && +x.price>0).map(x => ({ title: x.title.replace(/\s+/g,' ').trim(), price: +x.price, starting: !!x.starting, url: null }));
+    if(!items.length) throw new Error('no devolvió productos');
+    return items;
+  }
+};
 function routeOrder(){
   const all = ['lector','puente','gemini'].filter(r => (r!=='puente'||cfg.bridge) && (r!=='gemini'||cfg.key));
   if(cfg.route && all.includes(cfg.route)) all.unshift(...all.splice(all.indexOf(cfg.route),1));
   return all;
-}
-function useRoute(r){ if(cfg.route!==r){ cfg.route=r; saveCfg(); } }
-
-async function getHtml(url, raw){
-  const errs=[];
-  for(const r of routeOrder().filter(x=>htmlRoutes[x])){
-    try{
-      const h = await htmlRoutes[r](url, raw);
-      if(looksBlocked(h)) { errs.push(r+': bloqueado'); continue; }
-      return h;
-    }catch(e){ if(e instanceof NotFound) throw e; errs.push(r+': '+e.message); }
-  }
-  throw new Error('No pude abrir la página de Rough Country ('+errs.join('; ')+').');
-}
-
-async function viaGemini(url){
-  const prompt = `Open this page: ${url}
-List every product shown in the product results grid. For each one give the full product name exactly as written on the page (keep the " | " separators, the drive type and the years), the price as a number, and starting=true if the price says "Starting at".
-Reply ONLY with a JSON array, no other text, like:
-[{"title":"6 Inch Lift Kit | Ford F-150 4WD (2021-2026)","price":1399.95,"starting":true}]
-If the page cannot be opened, reply [].`;
-  const { text } = await geminiAny('chat', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } });
-  const m = text.match(/\[[\s\S]*\]/);
-  let arr=[]; try{ arr = m ? JSON.parse(m[0]) : []; }catch(e){ arr=[]; }
-  return arr.filter(x => x && typeof x.title==='string' && +x.price>0).map(x => ({ title: x.title.replace(/\s+/g,' ').trim(), price: +x.price, starting: !!x.starting, url: null }));
 }
 
 let lastRoute = '';
@@ -372,21 +411,9 @@ async function loadListing(url){
   const errs=[];
   for(const r of routeOrder()){
     try{
-      let items;
-      if(r==='gemini') items = await viaGemini(url);
-      else {
-        const html = await htmlRoutes[r](url);
-        if(looksBlocked(html)) { errs.push(r+': bloqueado'); continue; }
-        const first = C.parseListing(parseDoc(html));
-        items = first.items;
-        if(!items.length && !/Filter Results|lift kit/i.test(html)) { errs.push(r+': sin productos'); continue; }
-        if(first.pages.length){
-          const extra = await Promise.all(first.pages.slice(0,5).map(p => htmlRoutes[r](p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
-          extra.forEach(x => items = items.concat(x));
-        }
-      }
-      if(!items.length && r!==routeOrder().slice(-1)[0]) { errs.push(r+': 0 kits'); continue; }
-      useRoute(r); lastRoute = r;
+      const items = await ROUTES[r](url);
+      if(cfg.route!==r){ cfg.route=r; saveCfg(); }
+      lastRoute = r;
       return items;
     }catch(e){
       if(e instanceof NotFound) throw e;
@@ -394,6 +421,16 @@ async function loadListing(url){
     }
   }
   throw new Error('No pude leer Rough Country ('+errs.join('; ')+').');
+}
+
+// HTML de una página de producto (para amortiguadores)
+async function getHtml(url, raw){
+  const errs=[];
+  for(const r of ['lector','puente'].filter(x => x!=='puente' || cfg.bridge)){
+    try{ return r==='lector' ? await readerGet(url, 'html') : await bridgeHtml(url, raw); }
+    catch(e){ errs.push(r+': '+e.message); }
+  }
+  throw new Error('No pude abrir la página del kit ('+errs.join('; ')+').');
 }
 
 // ---------- Cotizar ----------
@@ -622,6 +659,7 @@ $('#test').onclick = async () => {
     try{ await geminiAny('parse', { contents:[{role:'user',parts:[{text:'Reply with the word OK'}]}] }); lines.push('✓ Gemini funciona ('+cfg.parseModel+').'); }
     catch(e){ lines.push('✗ Gemini: '+e.message); }
   } else lines.push('· Sin clave de Gemini (opcional para mensajes simples).');
+  Object.keys(diag).forEach(k => lines.push('· '+k+': '+diag[k]));
   o.innerHTML = lines.map(esc).join('<br>');
 };
 

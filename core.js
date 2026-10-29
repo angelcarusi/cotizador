@@ -253,6 +253,35 @@
     return { items, pages: Array.from(pages) };
   }
 
+  // Igual que parseListing pero sobre texto plano/markdown (lo que devuelve el lector en modo texto).
+  function parseText(text) {
+    const lines = String(text || '').split(/\n+/).map(l => l.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const isTitle = t => t.length >= 8 && t.length <= 260 && t.includes('|') && !/\$\s*\d/.test(t) && /lift kit|level/i.test(t);
+    const items = [], seen = new Set();
+    for (let i = 0; i < lines.length; i++) {
+      let t = lines[i], url = null;
+      const md = t.match(/^\W*\[([^\]]+)\]\((https?:[^)\s]+)/);
+      if (md) { t = md[1].trim(); url = md[2]; }
+      t = t.replace(/^[#>*\-\s]+/, '').replace(/[*_`]/g, '').trim();
+      if (!isTitle(t)) continue;
+      let price = null, starting = false;
+      for (let j = i + 1; j < Math.min(lines.length, i + 14); j++) {
+        const u = lines[j].replace(/[*_`]/g, '');
+        const um = u.match(/^\W*\[([^\]]+)\]/);
+        if (isTitle(um ? um[1] : u)) break;
+        if (/starting at/i.test(u)) starting = true;
+        const p = u.match(/\$\s*([\d,]+\.\d{2})/);
+        if (p) { price = parseFloat(p[1].replace(/,/g, '')); break; }
+      }
+      if (price == null) continue;
+      const key = t + '|' + price;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ title: t, price, starting, url: url && /roughcountry\.com/.test(url) ? url : null });
+    }
+    return items;
+  }
+
   // ---------- Armar la cotización ----------
   // items: [{title, price, url, starting}] ; q: {model, year, drive, inches, kind}
   function buildQuote(items, q) {
@@ -291,7 +320,7 @@
     return { blocks, others, fitsCount: fits.length };
   }
 
-  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, buildQuote, slugify, squash };
+  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, slugify, squash };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Core = api;
 })(this);
