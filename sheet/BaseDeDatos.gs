@@ -77,7 +77,7 @@ function banda(sh, row, cols, title, sub) {
 }
 
 function armarCatalogo(sh) {
-  sh.setHiddenGridlines(true);
+  try { sh.setHiddenGridlines(true); } catch (e) { }
   banda(sh, 1, COLS, T.titulo, T.sub);
   sh.getRange(3, 1, 1, COLS).setValues([HEAD]);
   sh.setFrozenRows(3);
@@ -123,7 +123,7 @@ function estiloCatalogo(sh) {
 }
 
 function armarHistorial(sh) {
-  sh.setHiddenGridlines(true);
+  try { sh.setHiddenGridlines(true); } catch (e) { }
   banda(sh, 1, 4, 'HISTORIAL DE COTIZACIONES', 'Cada vez que copias una cotización en el panel');
   sh.getRange(3, 1, 1, 4).setValues([['Fecha', 'Vehículo', 'Mensaje del cliente', 'Cotización enviada']]);
   sh.setFrozenRows(3);
@@ -139,7 +139,7 @@ function armarListas(sh) {
 }
 
 function armarBuscar(sh) {
-  sh.setHiddenGridlines(true);
+  try { sh.setHiddenGridlines(true); } catch (e) { }
   const W = 7;
   [24, 120, 170, 120, 130, 420, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
   banda(sh, 1, W, T.titulo, 'Elige el vehículo y te muestro los kits y precios');
