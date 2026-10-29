@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.0.0
+// @version      1.1.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=6
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=7
 // @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
+// @connect      angelcarusi.github.io
 // @run-at       document-idle
 // @updateURL    https://angelcarusi.github.io/cotizador/cotizador.user.js
 // @downloadURL  https://angelcarusi.github.io/cotizador/cotizador.user.js
@@ -17,6 +19,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
+  const SCRIPT_V = 2; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -86,6 +89,7 @@
     <div class="chips" id="lng"><button data-v="en">Inglés</button><button data-v="es">Español</button></div>
     <div class="chips"><input id="inch" inputmode="decimal" placeholder='Pulg.'><span id="kndBox"></span></div>
     <div id="out"><div class="msg">Leyendo los kits de esta página…</div></div>
+    <div class="msg" id="upd" hidden><a href="${APP}cotizador.user.js">Hay una versión nueva del script: toca aquí y luego Actualizar</a></div>
     <div class="msg"><a href="${APP}">← Volver al cotizador</a></div>
   </div>
   <button class="mini" id="open" hidden>Cotización</button>
@@ -213,4 +217,12 @@
     if (++tries < 4) setTimeout(run, tries === 1 ? 1200 : 2500);
   }
   run();
+
+  // aviso de versión nueva
+  try {
+    GM_xmlhttpRequest({ method: 'GET', url: APP + 'script-version.txt?t=' + Date.now(), onload: r => {
+      const v = parseInt(String(r.responseText || '').trim(), 10);
+      if (v > SCRIPT_V) $('#upd').hidden = false;
+    } });
+  } catch (e) { }
 })();

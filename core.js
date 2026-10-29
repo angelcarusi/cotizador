@@ -194,8 +194,72 @@
       texts.push({ t, node: n });
     }
     const isTitle = t => t.length >= 8 && t.length <= 220 && t.includes('|') && !t.includes('$') && /lift kit|level/i.test(t);
+    const pages = new Set();
+    body.querySelectorAll('a[href*="/page/"]').forEach(a => {
+      const h = a.getAttribute('href');
+      if (/\/page\/\d+/.test(h) && !/\/page\/1(\/|$|\?)/.test(h)) {
+        try { pages.add(new URL(h, 'https://www.roughcountry.com/').href); } catch (e) { }
+      }
+    });
 
-    // elemento más profundo que contiene el título completo
+    // 1) Tarjetas de producto (como se ven en el celular): el nombre ("3.5 INCH LIFT KIT")
+    //    y el vehículo ("Chevy Silverado 1500 2WD/4WD (2019-2024)") van en líneas separadas.
+    const isPrice = t => /^\$\s*[\d,]+\.\d{2}$/.test(t);
+    const kitWord = /lift kit|level/i;
+    const junk = /reviews?\b|rating|out of 5|starting at|configurable|in stock|out of stock|add to cart|compare|^sale$|save \$|free shipping|ships |^\(?\d+\)?$|^new$|^best seller$|^[★☆✩✪\s]+$/i;
+    const productHrefs = el => new Set([...el.querySelectorAll('a[href]')].map(a => a.getAttribute('href')).filter(h => /\.html/i.test(h)).map(h => h.split('#')[0].split('?')[0]));
+    // precio = elemento cuyo texto completo es "$559.95" (aunque venga partido en <span>)
+    const priceEls = [];
+    body.querySelectorAll('*').forEach(el => {
+      const t = norm(el.textContent);
+      if (!isPrice(t)) return;
+      for (const c of el.children) if (norm(c.textContent) === t) return;
+      priceEls.push(el);
+    });
+    const countPrices = el => priceEls.filter(p => el.contains(p)).length;
+    const cardEls = [];
+    priceEls.forEach(pe => {
+      let el = pe.parentElement;
+      for (let k = 0; k < 12 && el && el !== body; k++, el = el.parentElement) {
+        if (!kitWord.test(el.textContent)) continue;
+        if (countPrices(el) <= 3 && productHrefs(el).size <= 1 && !cardEls.includes(el)) cardEls.push(el);
+        break;
+      }
+    });
+    const cardItems = [];
+    const cardSeen = new Set();
+    cardEls.forEach(el => {
+      const segs = [];
+      let price = null, starting = false, full = null;
+      const myPrices = priceEls.filter(p => el.contains(p));
+      const inPrice = node => myPrices.some(p => p.contains(node));
+      const tw = doc.createTreeWalker(el, SHOW_TEXT); let d;
+      while ((d = tw.nextNode())) {
+        const t = norm(d.nodeValue);
+        if (!t) continue;
+        if (/starting at/i.test(t)) starting = true;
+        if (inPrice(d)) {
+          if (price == null) { const pe = myPrices.find(p => p.contains(d)); price = parseFloat(norm(pe.textContent).replace(/[$,\s]/g, '')); }
+          continue;
+        }
+        if (price != null) continue;
+        if (isTitle(t)) full = full || t;
+        if (t.length < 2 || t.length > 160 || junk.test(t)) continue;
+        if (!segs.some(s => s.toLowerCase() === t.toLowerCase())) segs.push(t);
+      }
+      const title = full || segs.join(' | ');
+      if (price == null || !kitWord.test(title)) return;
+      const key = title.toLowerCase() + '|' + price;
+      if (cardSeen.has(key)) return;
+      cardSeen.add(key);
+      const href = [...productHrefs(el)][0] || null;
+      let url = null;
+      try { url = href ? new URL(href, 'https://www.roughcountry.com/').href : null; } catch (e) { url = null; }
+      cardItems.push({ title, price, starting, url });
+    });
+    if (cardItems.length) return { items: cardItems, pages: Array.from(pages) };
+
+    // 2) Respaldo: elemento más profundo que contiene el título completo con " | "
     const found = [];
     body.querySelectorAll('*').forEach(el => {
       const t = norm(el.textContent);
@@ -246,14 +310,6 @@
       let url = null;
       try { url = href ? new URL(href, 'https://www.roughcountry.com/').href : null; } catch (e) { url = null; }
       items.push({ title: t, price, starting, url });
-    });
-
-    const pages = new Set();
-    body.querySelectorAll('a[href*="/page/"]').forEach(a => {
-      const h = a.getAttribute('href');
-      if (/\/page\/\d+/.test(h) && !/\/page\/1(\/|$|\?)/.test(h)) {
-        try { pages.add(new URL(h, 'https://www.roughcountry.com/').href); } catch (e) { }
-      }
     });
     return { items, pages: Array.from(pages) };
   }
