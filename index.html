@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b1f24">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cotizador">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Cotizador Cheap on Tires</title>
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --fg:#1b1f24; --muted:#636b74; --line:#dfe2dc;
+  --accent:#d9480f; --accent-fg:#ffffff; --ok:#2b8a3e; --warn:#b35c00; --chip:#eceee9;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14171a; --card:#1d2125; --fg:#e8eaec; --muted:#9aa3ab; --line:#30363c;
+    --accent:#ff6b2c; --accent-fg:#111; --ok:#51cf66; --warn:#ffa94d; --chip:#272c31; color-scheme: dark; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:env(safe-area-inset-top) max(12px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));}
+header{display:flex;align-items:center;gap:8px;padding:10px 0}
+header h1{font-size:17px;margin:0;flex:1;letter-spacing:.2px}
+.tabs{display:flex;background:var(--chip);border-radius:10px;padding:3px}
+.tabs button{border:0;background:none;color:var(--muted);padding:7px 12px;border-radius:8px;font:inherit;font-size:14px}
+.tabs button.on{background:var(--card);color:var(--fg);font-weight:600}
+.icon-btn{border:0;background:none;color:var(--muted);font-size:20px;padding:6px 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+textarea,input,select{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px}
+textarea{min-height:92px;resize:vertical}
+textarea:focus,input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.row{display:flex;gap:8px;margin-top:8px}
+.row>*{flex:1;min-width:0}
+.btn{border:0;border-radius:10px;padding:12px;font:inherit;font-weight:600;background:var(--chip);color:var(--fg)}
+.btn.main{background:var(--accent);color:var(--accent-fg)}
+.btn:active{transform:scale(.98)}
+.grid{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:8px}
+.grid .full{grid-column:1/-1}
+label.f{display:block;font-size:12px;color:var(--muted);margin:0 0 3px 2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:20px;padding:7px 12px;font:inherit;font-size:14px}
+.chips button.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.miss{outline:2px solid var(--warn)}
+#status{font-size:13px;color:var(--muted);min-height:18px;margin:2px 2px 8px}
+#status.err{color:var(--warn)}
+.block h3{font-size:13px;margin:0 0 8px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+pre.out{font-family:var(--mono);font-size:14px;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px;margin:0 0 8px;user-select:all;-webkit-user-select:all}
+.kits{font-size:13px;color:var(--muted);margin-top:6px}
+.kit{display:flex;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+.kit .t{flex:1;min-width:0}
+.kit .t b{color:var(--fg);font-weight:600}
+.kit a{color:var(--accent)}
+.kit button{border:1px solid var(--line);background:none;color:var(--fg);border-radius:8px;padding:5px 8px;font-size:12px}
+.shocks{padding:6px 0 4px}
+.shocks .chips button{font-size:12px;padding:5px 9px}
+details{font-size:13px;color:var(--muted);margin-top:6px}
+details li{margin:3px 0}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+#chatLog{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.msg{padding:10px 12px;border-radius:12px;max-width:92%;white-space:pre-wrap;word-break:break-word;font-size:15px}
+.msg.u{align-self:flex-end;background:var(--accent);color:var(--accent-fg)}
+.msg.a{align-self:flex-start;background:var(--card);border:1px solid var(--line)}
+.msg .cp{display:block;margin-top:6px;font-size:12px;color:var(--muted);background:none;border:0;padding:0}
+.help{font-size:13px;color:var(--muted)}
+.help ol{padding-left:18px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>Cotizador</h1>
+  <div class="tabs">
+    <button id="tabQ" class="on">Cotizar</button>
+    <button id="tabC">Consultas</button>
+  </div>
+  <button class="icon-btn" id="openSet" aria-label="Ajustes">⚙︎</button>
+</header>
+
+<!-- ============ COTIZAR ============ -->
+<main id="viewQ">
+  <div class="card">
+    <textarea id="msg" placeholder="Pega aquí el mensaje del cliente&#10;Ej: How much for a 6 inch lift on my 2021 Silverado 4x4?"></textarea>
+    <div class="row">
+      <button class="btn" id="paste">Pegar</button>
+      <button class="btn main" id="go">Cotizar</button>
+    </div>
+    <div class="grid">
+      <div><label class="f" for="mk">Marca</label><select id="mk"></select></div>
+      <div><label class="f" for="md">Modelo</label><input id="md" list="mdList" autocomplete="off" placeholder="F-150"><datalist id="mdList"></datalist></div>
+      <div><label class="f" for="yr">Año</label><input id="yr" inputmode="numeric" maxlength="4" placeholder="2024"></div>
+      <div><label class="f" for="in">Pulgadas</label><input id="in" inputmode="decimal" placeholder="Todas"></div>
+      <div class="full"><label class="f">Tracción</label>
+        <div class="chips" id="drv"><button data-v="4WD">4x4</button><button data-v="2WD">4x2</button><button data-v="" class="on">Ambas</button></div></div>
+      <div class="full"><label class="f">Tipo</label>
+        <div class="chips" id="knd"><button data-v="" class="on">Todos</button><button data-v="leveling">Leveling</button><button data-v="lift">Lift</button></div></div>
+      <div class="full"><label class="f">Idioma de la respuesta</label>
+        <div class="chips" id="lng"><button data-v="auto" class="on">Automático</button><button data-v="en">Inglés</button><button data-v="es">Español</button></div></div>
+    </div>
+  </div>
+  <div id="status"></div>
+  <div id="results"></div>
+</main>
+
+<!-- ============ CONSULTAS ============ -->
+<main id="viewC" hidden>
+  <div id="chatLog"></div>
+  <div class="card">
+    <textarea id="ask" placeholder="Pregunta algo técnico: medidas de llanta con un 6&quot;, diferencia entre N3 y M1, qué necesita un leveling…"></textarea>
+    <div class="row">
+      <button class="btn" id="clearChat">Borrar chat</button>
+      <button class="btn main" id="send">Enviar</button>
+    </div>
+  </div>
+</main>
+
+<!-- ============ AJUSTES ============ -->
+<main id="viewS" hidden>
+  <div class="card">
+    <label class="f" for="sBridge">Enlace del puente (Google Apps Script)</label>
+    <input id="sBridge" placeholder="https://script.google.com/macros/s/…/exec">
+    <div style="height:10px"></div>
+    <label class="f" for="sKey">Clave de Gemini (API key)</label>
+    <input id="sKey" placeholder="AIza…" autocomplete="off">
+    <div style="height:10px"></div>
+    <div class="row" style="margin:0">
+      <div><label class="f" for="sPm">Modelo para leer mensajes</label><input id="sPm"></div>
+      <div><label class="f" for="sCm">Modelo para consultas</label><input id="sCm"></div>
+    </div>
+    <div style="height:10px"></div>
+    <label class="f">Buscar en internet en Consultas</label>
+    <div class="chips" id="sWeb"><button data-v="1">Sí</button><button data-v="0">No</button></div>
+    <div class="row">
+      <button class="btn" id="test">Probar conexión</button>
+      <button class="btn main" id="save">Guardar</button>
+    </div>
+    <div id="testOut" class="help" style="margin-top:8px"></div>
+  </div>
+  <div class="card help">
+    <b>Dónde se guarda esto:</b> solo en este teléfono. El enlace del puente y la clave no se suben a internet.<br><br>
+    Cada vez que copias una cotización se anota en la hoja de Google «Cotizador - historial» de tu cuenta.
+  </div>
+  <div class="row"><button class="btn" id="closeSet">Volver</button></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="core.js?v=1"></script>
+<script>
+(function(){
+'use strict';
+const C = window.Core;
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+const DEF = { bridge:'', key:'', parseModel:'gemini-3.5-flash-lite', chatModel:'gemini-3.8-flash', web:true };
+const cfg = Object.assign({}, DEF, LS.get('cfg', {}));
+const saveCfg = () => LS.set('cfg', cfg);
+
+function toast(t){ const e=$('#toast'); e.textContent=t; e.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>e.classList.remove('on'),1600); }
+function status(t, err){ const e=$('#status'); e.textContent=t||''; e.className=err?'err':''; }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// ---------- pestañas ----------
+function show(v){
+  ['Q','C','S'].forEach(x => $('#view'+x).hidden = x!==v);
+  $('#tabQ').classList.toggle('on', v==='Q'); $('#tabC').classList.toggle('on', v==='C');
+  if(v==='S') fillSettings();
+}
+$('#tabQ').onclick = () => show('Q');
+$('#tabC').onclick = () => show('C');
+$('#openSet').onclick = () => show('S');
+$('#closeSet').onclick = () => show('Q');
+
+// ---------- chips ----------
+function chips(id, onChange){
+  const box=$(id);
+  box.addEventListener('click', e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    box.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
+    onChange && onChange(b.dataset.v);
+  });
+  return {
+    get: () => (box.querySelector('button.on')||{dataset:{v:''}}).dataset.v,
+    set: v => box.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x.dataset.v===(v||'')))
+  };
+}
+const drv = chips('#drv', () => search());
+const knd = chips('#knd', () => search());
+const lng = chips('#lng', v => { LS.set('lang', v); if(lastQ) { lastQ.lang = langNow(); render(lastQ, lastItems); } });
+lng.set(LS.get('lang','auto'));
+const langNow = () => { const v = lng.get(); return v==='auto' ? (C.isSpanish($('#msg').value) ? 'es' : 'en') : v; };
+const web = chips('#sWeb');
+
+// ---------- marca / modelo ----------
+const mkSel=$('#mk');
+mkSel.innerHTML = '<option value="">—</option>' + C.MAKES.map(m=>`<option value="${m[0]}">${m[1]}</option>`).join('');
+function fillModels(){
+  const mk=mkSel.value;
+  $('#mdList').innerHTML = C.MODELS.filter(m=>m.mk===mk).map(m=>`<option value="${esc(m.label)}">`).join('');
+}
+mkSel.onchange = () => { fillModels(); $('#md').value=''; };
+let deb;
+const later = () => { clearTimeout(deb); deb=setTimeout(search, 450); };
+['#md','#yr','#in'].forEach(s => $(s).addEventListener('input', later));
+mkSel.addEventListener('change', later);
+
+function setForm(p){
+  if(p.model){ mkSel.value=p.model.mk; fillModels(); $('#md').value=p.model.label; }
+  if(p.year) $('#yr').value=p.year;
+  $('#in').value = p.inches!=null ? C.inchStr(p.inches) : '';
+  drv.set(p.drive||''); knd.set(p.kind||'');
+}
+function readForm(){
+  const mk=mkSel.value, mdTxt=$('#md').value.trim();
+  const y=parseInt($('#yr').value,10);
+  const i=parseFloat(($('#in').value||'').replace(',','.'));
+  return {
+    model: mk && mdTxt ? C.resolveModel(mk, mdTxt) : null,
+    year: y>=1950 && y<=2100 ? y : null,
+    inches: i>0 && i<=12 ? i : null,
+    drive: drv.get()||null,
+    kind: knd.get()||null,
+    lang: langNow()
+  };
+}
+
+// ---------- Gemini ----------
+async function gemini(model, body){
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(cfg.key),
+    { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error((j.error&&j.error.message)||('Gemini respondió '+r.status)); e.status=r.status; throw e; }
+  const c = j.candidates && j.candidates[0];
+  const parts = (c && c.content && c.content.parts) || [];
+  return { text: parts.map(p=>p.text||'').join(''), meta: c && c.groundingMetadata };
+}
+async function geminiAny(kind, body){
+  const pref = kind==='parse'
+    ? [cfg.parseModel,'gemini-3.5-flash-lite','gemini-flash-lite-latest','gemini-3.8-flash','gemini-flash-latest']
+    : [cfg.chatModel,'gemini-3.8-flash','gemini-flash-latest','gemini-3.6-flash','gemini-3.5-flash-lite'];
+  const list = pref.filter((m,i)=>m && pref.indexOf(m)===i);
+  let last;
+  for(const m of list){
+    try{
+      const out = await gemini(m, body);
+      if(kind==='parse' && m!==cfg.parseModel){ cfg.parseModel=m; saveCfg(); }
+      if(kind==='chat' && m!==cfg.chatModel){ cfg.chatModel=m; saveCfg(); }
+      return out;
+    }catch(e){
+      last=e;
+      if(e.status===404 || /not found|not supported|is not available|deprecated/i.test(e.message)) continue;
+      throw e;
+    }
+  }
+  throw last || new Error('No hay modelo de Gemini disponible');
+}
+
+const KNOWN = C.MODELS.map(m=>`${C.makeLabel(m.mk)} ${m.label} -> ${m.mk}/${m.md}`).join('\n');
+const PARSE_SYS = `Extract the vehicle and the request from a customer message for a lift kit shop. The message can be in English or Spanish and may contain typos or slang.
+Return ONLY JSON with these keys:
+{"make":"ford|chevy|gmc|ram|dodge|toyota|jeep|nissan|<other lowercase>","model":"<Rough Country model slug>","label":"<short model name>","year":<4-digit number or null>,"drive":"4WD"|"2WD"|null,"inches":<number or null>,"kind":"lift"|"leveling"|null}
+Rules:
+- Use Rough Country URL slugs. Known vehicles (label -> make/model slug):
+${KNOWN}
+- For other vehicles, model slug = lowercase words joined by hyphens (e.g. "sequoia", "super-duty").
+- Chevrolet = chevy. Dodge Ram 2010 or newer = make "ram".
+- 2-digit years: "21" or "'21" = 2021. Only set year if the message says it.
+- drive: 4x4/4wd/AWD -> "4WD"; 4x2/2wd/RWD -> "2WD"; otherwise null.
+- inches: only the lift height the customer asks for (6 inch, 6", 6 pulgadas). Ignore tire sizes like 35" or 33x12.50.
+- kind: "leveling" if they say level/leveling/nivelar; "lift" only if they clearly ask for a specific lift height; else null.`;
+
+async function aiParse(msg){
+  const { text } = await geminiAny('parse', {
+    systemInstruction: { parts:[{ text: PARSE_SYS }] },
+    contents: [{ role:'user', parts:[{ text: msg.slice(0,2000) }] }],
+    generationConfig: { responseMimeType:'application/json', temperature:0 }
+  });
+  let j; try{ j=JSON.parse(text.replace(/^```(?:json)?|```$/g,'').trim()); }catch(e){ throw new Error('Gemini no devolvió datos válidos'); }
+  const mk = C.slugify(j.make||'');
+  const model = mk && (j.model||j.label) ? C.resolveModel(mk, j.model||j.label) : null;
+  if(model && model.generic && j.label) model.label = j.label;
+  return {
+    model,
+    year: +j.year>=1950 ? +j.year : null,
+    drive: j.drive==='4WD'||j.drive==='2WD' ? j.drive : null,
+    inches: +j.inches>0 && +j.inches<=12 ? +j.inches : null,
+    kind: j.kind==='lift'||j.kind==='leveling' ? j.kind : null
+  };
+}
+
+// ---------- Puente / Rough Country ----------
+async function bridgeGet(url, raw){
+  if(!cfg.bridge) throw new Error('Falta el enlace del puente. Ponlo en Ajustes ⚙︎');
+  const r = await fetch(cfg.bridge + '?url=' + encodeURIComponent(url) + (raw?'&raw=1':''));
+  const j = await r.json().catch(()=>null);
+  if(!j) throw new Error('El puente no respondió bien. Revisa el enlace en Ajustes.');
+  if(!j.ok) throw new Error(j.status===404 ? 'Rough Country no tiene esa página (revisa modelo y año).' : (j.status ? 'Rough Country respondió '+j.status : (j.error||'Error del puente')));
+  return j.html;
+}
+const parseDoc = html => new DOMParser().parseFromString(html, 'text/html');
+
+async function loadListing(url){
+  const first = C.parseListing(parseDoc(await bridgeGet(url)));
+  let items = first.items;
+  if(first.pages.length){
+    const extra = await Promise.all(first.pages.slice(0,5).map(p => bridgeGet(p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
+    extra.forEach(x => items = items.concat(x));
+  }
+  return items;
+}
+
+// ---------- Cotizar ----------
+let runId = 0, lastQ = null, lastItems = [], lastMsg = '';
+const extras = LS.get('extras', {}); // precio extra por amortiguadores, por kit
+
+function vehicleUrl(q){ return `https://www.roughcountry.com/lift-kits/${q.model.mk}/${q.model.md}/${q.year}`; }
+function vehicleName(q){ return `${C.makeLabel(q.model.mk)} ${q.model.label} ${q.year}`; }
+
+async function search(){
+  const q = readForm();
+  ['#md','#yr'].forEach(s=>$(s).classList.remove('miss'));
+  if(!q.model || !q.year){
+    if(!q.model) $('#md').classList.add('miss');
+    if(!q.year) $('#yr').classList.add('miss');
+    status(!q.model && !q.year ? 'Falta modelo y año.' : (!q.model ? 'Falta el modelo.' : 'Falta el año.'), true);
+    return;
+  }
+  const id = ++runId;
+  const url = vehicleUrl(q);
+  const cached = LS.get('c:'+url, null);
+  if(cached){
+    render(q, cached.items);
+    status('Precios guardados ' + ago(cached.ts) + ' · actualizando…');
+  } else {
+    $('#results').innerHTML='';
+    status('Buscando en Rough Country…');
+  }
+  try{
+    const items = await loadListing(url);
+    if(id!==runId) return;
+    LS.set('c:'+url, { ts: Date.now(), items });
+    render(q, items);
+    status(items.length ? 'Precios al día · ' + vehicleName(q) : 'Rough Country no muestra kits para ese vehículo y año.', !items.length);
+  }catch(e){
+    if(id!==runId) return;
+    status((cached ? 'No pude actualizar, uso los precios guardados. ' : '') + e.message, true);
+  }
+}
+function ago(ts){
+  const m = Math.round((Date.now()-ts)/60000);
+  if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min';
+  const h=Math.round(m/60); if(h<48) return 'hace '+h+' h';
+  return 'hace '+Math.round(h/24)+' días';
+}
+
+function render(q, items){
+  lastQ=q; lastItems=items;
+  const withExtra = items.map(it => Object.assign({}, it, { extra: extras[it.url||it.title] || 0 }));
+  const res = C.buildQuote(withExtra, q);
+  const out = $('#results');
+  out.innerHTML='';
+  res.blocks.forEach(b=>{
+    const card=document.createElement('div'); card.className='card block';
+    const title = vehicleName(q) + ' · ' + (b.drive==='4WD'?'4x4':'4x2');
+    let html = `<h3>${esc(title)}</h3>`;
+    if(!b.kits.length){
+      const sizes=[...new Set(b.sizes.map(k=>(k.kind==='leveling'?'leveling ':'lift ')+C.inchStr(k.inches)+'"'))];
+      html += `<div class="help">${q.inches!=null||q.kind ? 'No hay ese kit para esta camioneta.' : 'No hay kits para esta tracción.'}${sizes.length?' Disponibles: '+esc(sizes.join(', '))+'.':''}</div>`;
+      card.innerHTML=html; out.appendChild(card); return;
+    }
+    html += `<pre class="out">${esc(b.text)}</pre><button class="btn main" style="width:100%" data-copy>Copiar</button><div class="kits">`;
+    b.kits.forEach((k,i)=>{
+      const key=k.url||k.title;
+      html += `<div class="kit"><div class="t"><b>${C.inchStr(k.inches)}" ${k.kind==='leveling'?'leveling':'lift'}</b> · base ${C.money(k.price)}${k.extra?` + ${C.money(k.extra)} amort.`:''}${k.starting?' (desde)':''} → ${C.money(k.sale)}<br><span>${esc(k.title)}</span>${k.url?` · <a href="${esc(k.url)}" target="_blank" rel="noopener">ver</a>`:''}</div>${k.kind==='lift'?`<button data-shock="${esc(key)}" data-url="${esc(k.url||'')}">Amort.</button>`:''}</div><div class="shocks" data-for="${esc(key)}" hidden></div>`;
+    });
+    html += `</div>`;
+    card.innerHTML=html;
+    card.querySelector('[data-copy]').onclick = () => copy(b.text, title);
+    card.querySelectorAll('[data-shock]').forEach(btn => btn.onclick = () => shocks(card, btn.dataset.shock, btn.dataset.url));
+    out.appendChild(card);
+  });
+  if(res.others.length){
+    const d=document.createElement('details');
+    d.innerHTML = `<summary>${res.others.length} kits de la página que no son de este vehículo o año (no se cotizan)</summary><ul>${res.others.map(k=>`<li>${esc(k.title)} · ${C.money(k.price)}</li>`).join('')}</ul>`;
+    out.appendChild(d);
+  }
+}
+
+async function copy(text, vehicle){
+  let ok=false;
+  try{ await navigator.clipboard.writeText(text); ok=true; }catch(e){
+    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+    try{ ok=document.execCommand('copy'); }catch(_){} ta.remove();
+  }
+  toast(ok?'Copiado':'No se pudo copiar, mantén presionado el texto');
+  if(ok && cfg.bridge){
+    const log = JSON.stringify({ v: vehicle, m: lastMsg.slice(0,600), r: text.slice(0,900) });
+    fetch(cfg.bridge + '?log=' + encodeURIComponent(log)).catch(()=>{});
+  }
+}
+
+// amortiguadores (opcional)
+async function shocks(card, key, url){
+  const box = [...card.querySelectorAll('.shocks')].find(x=>x.dataset.for===key);
+  if(!box) return;
+  if(!box.hidden){ box.hidden=true; return; }
+  box.hidden=false;
+  const cur = extras[key]||0;
+  const manual = `<div class="row" style="margin-top:6px"><input inputmode="decimal" placeholder="Extra $ (precio del upgrade)" value="${cur||''}" data-manual><button class="btn" data-apply style="flex:0 0 auto">Aplicar</button></div>`;
+  box.innerHTML = '<div class="help">Buscando opciones…</div>' + manual;
+  wireManual(box, key);
+  if(!url) { box.querySelector('.help').textContent='Escribe el precio extra del amortiguador:'; return; }
+  try{
+    const doc = parseDoc(await bridgeGet(url, true));
+    const opts = shockOptions(doc);
+    if(!opts.length){ box.querySelector('.help').textContent='No encontré las opciones en la página. Escribe el precio extra:'; return; }
+    box.innerHTML = '<div class="chips">' + [{name:'Básico (incluido)', add:0}].concat(opts).map(o=>`<button data-add="${o.add}" class="${Math.abs(o.add-cur)<.01?'on':''}">${esc(o.name)}${o.add?' +'+C.money(o.add):''}</button>`).join('') + '</div>' + manual;
+    box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>setExtra(key, +b.dataset.add));
+    wireManual(box, key);
+  }catch(e){ box.querySelector('.help').textContent = e.message + ' Escribe el precio extra:'; }
+}
+function wireManual(box, key){
+  const inp=box.querySelector('[data-manual]'), ap=box.querySelector('[data-apply]');
+  if(ap) ap.onclick = () => setExtra(key, parseFloat((inp.value||'0').replace(/[$,]/g,''))||0);
+}
+function setExtra(key, add){
+  if(add) extras[key]=add; else delete extras[key];
+  LS.set('extras', extras);
+  render(lastQ, lastItems);
+}
+function shockOptions(doc){
+  const seen=new Map();
+  if(!doc.body) return [];
+  const lines = [];
+  const w = doc.createTreeWalker(doc.body, 4); let n;
+  while((n=w.nextNode())){ const t=n.nodeValue.replace(/\s+/g,' ').trim(); if(t) lines.push(t); }
+  const joined = lines.join('\n');
+  const re = /([A-Za-z0-9][A-Za-z0-9 .,'\/\-]{1,48}?)\s*\+\s*\$\s*([\d,]+\.\d{2})/g; let m;
+  while((m=re.exec(joined))){
+    const name=m[1].trim().replace(/\s+/g,' '); const add=parseFloat(m[2].replace(/,/g,''));
+    if(add>0 && add<5000 && !seen.has(name)) seen.set(name, add);
+  }
+  // también en <option> de selects
+  doc.querySelectorAll('option').forEach(o=>{
+    const t=o.textContent.replace(/\s+/g,' ').trim(); const p=t.match(/^(.*?)\s*\+\s*\$\s*([\d,]+\.\d{2})/);
+    if(p && !seen.has(p[1])) seen.set(p[1].trim(), parseFloat(p[2].replace(/,/g,'')));
+  });
+  return [...seen].map(([name,add])=>({name,add})).slice(0,8);
+}
+
+// ---------- Botones principales ----------
+$('#paste').onclick = async () => {
+  try{ const t = await navigator.clipboard.readText(); if(t){ $('#msg').value=t; go(); return; } }catch(e){}
+  $('#msg').focus(); toast('Mantén presionado y elige Pegar');
+};
+$('#go').onclick = () => go();
+
+async function go(){
+  const msg = $('#msg').value.trim();
+  if(!msg){ search(); return; }
+  lastMsg = msg;
+  const p = C.localParse(msg);
+  // si la app sola entendió modelo y año, no espera a Gemini
+  if(!(p.model && p.year) && cfg.key){
+    status('Leyendo el mensaje…');
+    try{
+      const g = await aiParse(msg);
+      ['model','year','drive','inches','kind'].forEach(k => { if(g[k]!=null && p[k]==null) p[k]=g[k]; });
+    }catch(e){ status('Gemini: '+e.message, true); }
+  } else if(!(p.model && p.year) && !cfg.key){
+    status('Para mensajes complicados agrega la clave de Gemini en Ajustes ⚙︎', true);
+  }
+  setForm(p);
+  search();
+}
+
+// ---------- Consultas ----------
+const CHAT_SYS = `Eres el asistente técnico de un vendedor de "Cheap on Tires", un taller en Estados Unidos que vende e instala lift kits y leveling kits (principalmente de Rough Country), llantas y rines para camionetas como Ford F-150, Chevy Silverado, GMC Sierra, RAM 1500, Toyota Tacoma/Tundra y Jeep.
+Responde en español, directo y práctico, en pocas líneas, como un mecánico experimentado le hablaría a un vendedor. Usa datos concretos (medidas de llanta que caben, diferencias entre amortiguadores N3, M1, V2 y Vertex, qué incluye cada kit, si hace falta alineación, efectos en garantía, consumo o manejo).
+Si no estás seguro de un dato, dilo claramente en vez de inventarlo. Si te piden redactar una respuesta para el cliente, escríbela en el idioma del cliente.`;
+let chat = LS.get('chat', []);
+function drawChat(){
+  const box=$('#chatLog'); box.innerHTML='';
+  chat.forEach((m,i)=>{
+    const d=document.createElement('div'); d.className='msg '+(m.role==='user'?'u':'a');
+    d.innerHTML = esc(m.text).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    if(m.role!=='user'){ const b=document.createElement('button'); b.className='cp'; b.textContent='Copiar'; b.onclick=()=>copyPlain(m.text); d.appendChild(b); }
+    box.appendChild(d);
+  });
+  window.scrollTo(0, document.body.scrollHeight);
+}
+async function copyPlain(t){ try{ await navigator.clipboard.writeText(t.replace(/\*\*/g,'')); toast('Copiado'); }catch(e){ toast('Mantén presionado para copiar'); } }
+$('#clearChat').onclick = () => { chat=[]; LS.set('chat',chat); drawChat(); };
+$('#send').onclick = async () => {
+  const t=$('#ask').value.trim(); if(!t) return;
+  if(!cfg.key){ toast('Agrega la clave de Gemini en Ajustes'); return; }
+  chat.push({role:'user', text:t}); $('#ask').value=''; drawChat();
+  const wait=document.createElement('div'); wait.className='msg a'; wait.textContent='Pensando…'; $('#chatLog').appendChild(wait);
+  const body = {
+    systemInstruction: { parts:[{ text: CHAT_SYS }] },
+    contents: chat.slice(-16).map(m=>({ role: m.role==='user'?'user':'model', parts:[{ text:m.text }] })),
+    generationConfig: { temperature: .4 }
+  };
+  try{
+    let out;
+    if(cfg.web){
+      try{ out = await geminiAny('chat', Object.assign({ tools:[{ google_search:{} }] }, body)); }
+      catch(e){ out = await geminiAny('chat', body); }
+    } else out = await geminiAny('chat', body);
+    chat.push({ role:'model', text: (out.text||'(sin respuesta)').trim() });
+  }catch(e){ chat.push({ role:'model', text:'Error: '+e.message }); }
+  LS.set('chat', chat.slice(-40)); drawChat();
+};
+
+// ---------- Ajustes ----------
+function fillSettings(){
+  $('#sBridge').value=cfg.bridge; $('#sKey').value=cfg.key;
+  $('#sPm').value=cfg.parseModel; $('#sCm').value=cfg.chatModel; web.set(cfg.web?'1':'0');
+}
+function readSettings(){
+  cfg.bridge=$('#sBridge').value.trim(); cfg.key=$('#sKey').value.trim();
+  cfg.parseModel=$('#sPm').value.trim()||DEF.parseModel; cfg.chatModel=$('#sCm').value.trim()||DEF.chatModel;
+  cfg.web = web.get()!=='0';
+}
+$('#save').onclick = () => { readSettings(); saveCfg(); toast('Guardado'); show('Q'); };
+$('#test').onclick = async () => {
+  readSettings(); saveCfg();
+  const o=$('#testOut'); o.textContent='Probando…';
+  const lines=[];
+  try{
+    const items = await loadListing('https://www.roughcountry.com/lift-kits/ford/f-150/2024');
+    lines.push(items.length ? `✓ Puente y Rough Country: ${items.length} kits leídos de la F-150 2024.` : '✗ El puente funciona pero no leí kits de Rough Country.');
+  }catch(e){ lines.push('✗ Puente: '+e.message); }
+  if(cfg.key){
+    try{ await geminiAny('parse', { contents:[{role:'user',parts:[{text:'Reply with the word OK'}]}] }); lines.push('✓ Gemini funciona ('+cfg.parseModel+').'); }
+    catch(e){ lines.push('✗ Gemini: '+e.message); }
+  } else lines.push('· Sin clave de Gemini (opcional para mensajes simples).');
+  o.innerHTML = lines.map(esc).join('<br>');
+};
+
+// inicio
+drawChat();
+if(!cfg.bridge) show('S');
+})();
+</script>
+</body>
+</html>
