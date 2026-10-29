@@ -105,24 +105,62 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 13, n, 1).setNumberFormat('mm/dd/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
 }
 
+// ---------------------------------------------------------------- colores por marca y modelo
+// Cada marca tiene su color; cada modelo es una variación (más claro / menos intenso) de ese color.
+const MAKE_COLORS = {
+  'Ram': [0, 62], 'Dodge': [22, 70], 'Honda': [44, 75], 'Rivian': [66, 55], 'Jeep': [95, 42],
+  'Toyota': [128, 42], 'Suzuki': [158, 42], 'Ford': [184, 52], 'Chevy': [212, 66], 'Subaru': [238, 50],
+  'GMC': [262, 46], 'Cadillac': [288, 40], 'Nissan': [318, 50], 'Mitsubishi': [340, 60],
+  'Mercedes-Benz': [210, 14], 'Tesla': [0, 0]
+};
+function makeHS(make) {
+  if (MAKE_COLORS[make]) return MAKE_COLORS[make];
+  let x = 0; for (const ch of String(make)) x = (x * 31 + ch.charCodeAt(0)) % 360;
+  return [x, 45];
+}
+function hsl(hh, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + hh / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return '#' + [f(0), f(8), f(4)].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+}
+// variaciones de modelo: [luminosidad, factor de saturación]
+const MODEL_STEPS = [[86, 1], [91, 0.85], [83, 0.55], [89, 0.6], [93, 1], [85, 0.35], [90, 0.45]];
+
 function estiloCatalogo(sh) {
   const last = Math.max(sh.getLastRow(), ROW0);
   const n = last - ROW0 + 1;
   sh.getBandings().forEach(b => b.remove());
-  const rng = sh.getRange(3, 1, n + 1, COLS - 1);
-  const b = rng.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
-  b.setHeaderRowColor(T.accent).setFirstRowColor(T.band1).setSecondRowColor(T.band2);
-  sh.getRange(ROW0, 1, n, COLS - 1).setBorder(null, null, true, null, null, true, T.line, SpreadsheetApp.BorderStyle.SOLID);
-  // Tipo con color
+  const vals = sh.getRange(ROW0, 1, n, 2).getValues();
+  const models = {};
+  vals.forEach(([mk, md]) => { if (!mk) return; (models[mk] = models[mk] || []); if (!models[mk].includes(String(md))) models[mk].push(String(md)); });
+  Object.keys(models).forEach(mk => models[mk].sort());
+  const bgs = [], fonts = [];
+  vals.forEach(([mk, md]) => {
+    if (!mk) { bgs.push(new Array(COLS - 1).fill('#ffffff')); fonts.push(new Array(COLS - 1).fill(T.ink)); return; }
+    const [hh, s] = makeHS(mk);
+    const i = models[mk].indexOf(String(md));
+    const [l, sf] = MODEL_STEPS[i % MODEL_STEPS.length];
+    const row = hsl(hh, Math.round(s * sf), l);
+    const head = hsl(hh, s, 74); // la columna Make lleva el color de la marca más intenso
+    const r = new Array(COLS - 1).fill(row); r[0] = head;
+    bgs.push(r);
+    const f = new Array(COLS - 1).fill(T.ink); f[8] = '#4a5462'; f[9] = '#4a5462'; f[12] = '#4a5462';
+    fonts.push(f);
+  });
+  const body = sh.getRange(ROW0, 1, n, COLS - 1);
+  body.setBackgrounds(bgs).setFontColors(fonts);
+  sh.getRange(ROW0, 1, n, 1).setFontWeight('bold');
+  body.setBorder(null, null, true, null, null, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
+  // Tipo: se distingue igual en cualquier color de fila
   const tipo = sh.getRange(ROW0, 6, Math.max(n, 1), 1);
-  const rules = [
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Lift').setBackground(T.accentSoft).setFontColor(T.accent).setRanges([tipo]).build(),
-    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Leveling').setBackground(T.levelSoft).setFontColor('#1c64b0').setRanges([tipo]).build()
-  ];
-  sh.setConditionalFormatRules(rules);
+  sh.setConditionalFormatRules([
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Lift').setBackground(T.ink).setFontColor('#ffffff').setBold(true).setRanges([tipo]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Leveling').setBackground('#ffffff').setFontColor(T.ink).setBold(true).setRanges([tipo]).build()
+  ]);
   if (sh.getFilter()) sh.getFilter().remove();
   sh.getRange(3, 1, n + 1, COLS - 1).createFilter();
-  sh.getRange(2, 1).setValue(T.sub + '  ·  ' + n + ' kits  ·  updated ' +
+  sh.getRange(2, 1).setValue(T.sub + '  ·  ' + (vals.filter(v => v[0]).length) + ' kits  ·  updated ' +
     Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy h:mm a'));
 }
 
@@ -218,10 +256,11 @@ function guardarKits(kits) {
   const now = new Date();
   const nuevos = [];
   let n = 0;
+  kits = kits.filter(k => k.instalado != null && k.instalado !== '');
   kits.forEach(k => {
     const row = [k.marca || '', k.modelo || '', (k.traccion === 'Todas' ? 'All' : (k.traccion || 'All')), k.desde || '', k.hasta || '',
       k.tipo === 'leveling' ? 'Leveling' : 'Lift', +k.pulgadas || '',
-      k.instalado == null ? 'Not offered' : +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
+      +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
       k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now, k.clave];
     if (!k.clave) return;
     if (pos[k.clave]) sh.getRange(pos[k.clave], 1, 1, COLS).setValues([row]);
@@ -234,6 +273,11 @@ function guardarKits(kits) {
     sh.getRange(start, 1, nuevos.length, COLS).setValues(nuevos);
     formatoDatos(sh, start, nuevos.length);
     sh.getRange(start, 1, nuevos.length, COLS).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
+  }
+  // quitar filas sin precio instalado (antes salían como "Not offered")
+  if (sh.getLastRow() >= ROW0) {
+    const hv = sh.getRange(ROW0, 8, sh.getLastRow() - ROW0 + 1, 1).getValues();
+    for (let i = hv.length - 1; i >= 0; i--) if (hv[i][0] === 'Not offered' || hv[i][0] === 'No se ofrece') sh.deleteRow(ROW0 + i);
   }
   const total = sh.getLastRow() - ROW0 + 1;
   if (total > 1) {

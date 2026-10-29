@@ -10,7 +10,8 @@
   const MAKES = [
     ['ford', 'Ford'], ['chevy', 'Chevy'], ['gmc', 'GMC'], ['ram', 'Ram'], ['dodge', 'Dodge'],
     ['toyota', 'Toyota'], ['jeep', 'Jeep'], ['nissan', 'Nissan'], ['honda', 'Honda'],
-    ['mercedes-benz', 'Mercedes-Benz'], ['mitsubishi', 'Mitsubishi'], ['subaru', 'Subaru']
+    ['mercedes-benz', 'Mercedes-Benz'], ['mitsubishi', 'Mitsubishi'], ['subaru', 'Subaru'],
+    ['cadillac', 'Cadillac'], ['rivian', 'Rivian'], ['suzuki', 'Suzuki'], ['tesla', 'Tesla']
   ];
 
   const MODELS = [

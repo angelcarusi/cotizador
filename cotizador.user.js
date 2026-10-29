@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.3.0
+// @version      1.3.1
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=9
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=10
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 5; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 6; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -187,6 +187,8 @@
       if (!model.match.test(it.title) || (model.not && model.not.test(it.title))) return;
       const key = model.mk + '/' + model.md + '|' + (it.url || it.title.toLowerCase());
       if (seen.has(key)) return; seen.add(key);
+      const inst = a.kind === 'leveling' ? C.levelPrice(it.price) : C.liftPrice(it.price);
+      if (inst == null) return; // leveling de más de $200: no se guarda
       const d = a.drives ? [...a.drives] : [];
       const y = a.years[0] || [];
       out.push({
@@ -194,7 +196,7 @@
         traccion: d.length === 1 ? (d[0] === '4WD' ? '4x4' : '4x2') : (d.length > 1 ? '4x2 / 4x4' : 'Todas'),
         desde: y[0] || '', hasta: y[1] && y[1] < 2100 ? y[1] : '',
         tipo: a.kind, pulgadas: a.inches,
-        instalado: a.kind === 'leveling' ? C.levelPrice(it.price) : C.liftPrice(it.price),
+        instalado: inst,
         base: it.price, starting: !!it.starting, titulo: it.title, url: it.url || ''
       });
     });
