@@ -1,6 +1,6 @@
 /**
- * Cheap on Tires · Lista de precios
- * Base de datos de lift y leveling kits que llena el panel de Rough Country (Firefox).
+ * Cheap on Tires · Price List
+ * Lift & leveling kit database filled by the Rough Country panel (Firefox).
  *
  * Instalación (una vez):
  *  1. En la Google Sheet: Extensiones → Apps Script, pega este código y guarda.
@@ -11,8 +11,8 @@
  */
 
 const T = {
-  titulo: 'CHEAP ON TIRES · LISTA DE PRECIOS',
-  sub: 'Lift y leveling kits Rough Country · precio instalado',
+  titulo: 'CHEAP ON TIRES · PRICE LIST',
+  sub: 'Rough Country lift & leveling kits · installed price',
   ink: '#1c2430',      // encabezados
   ink2: '#2d3a4b',
   accent: '#e8590c',   // naranja
@@ -29,9 +29,9 @@ const T = {
 const SHEET_ID = '1KfC2RsAekVtyfL9du3neXsj22CDS-iDbwFEnNChfrk0';
 function libro() { return SpreadsheetApp.getActive() || SpreadsheetApp.openById(SHEET_ID); }
 
-const CAT = 'Catálogo', BUS = 'Buscar', HIS = 'Historial', LIS = 'Listas';
-const HEAD = ['Marca', 'Modelo', 'Tracción', 'Año desde', 'Año hasta', 'Tipo', 'Pulgadas',
-  'Precio instalado', 'Precio base RC', 'Precio "desde"', 'Kit en Rough Country', 'Enlace', 'Actualizado', 'Clave'];
+const CAT = 'Catalog', BUS = 'Search', HIS = 'History', LIS = 'Lists';
+const HEAD = ['Make', 'Model', 'Drive', 'Year from', 'Year to', 'Type', 'Lift',
+  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Key'];
 const ROW0 = 4; // primera fila de datos en Catálogo
 const COLS = HEAD.length;
 
@@ -39,7 +39,7 @@ const COLS = HEAD.length;
 function crearBaseDeDatos() {
   const ss = libro();
   ss.setSpreadsheetTimeZone(Session.getScriptTimeZone());
-  ss.rename('Cheap on Tires · Lista de precios');
+  ss.rename('Cheap on Tires · Price List');
 
   // borrar todo
   const tmp = ss.insertSheet('_tmp' + Date.now());
@@ -90,6 +90,7 @@ function armarCatalogo(sh) {
 
 function formatoDatos(sh, r, n) {
   sh.getRange(r, 4, n, 2).setNumberFormat('0').setHorizontalAlignment('center');
+  sh.getRange(r, 1, n, 2).setNumberFormat('@');
   sh.getRange(r, 3, n, 1).setHorizontalAlignment('center');
   sh.getRange(r, 6, n, 1).setHorizontalAlignment('center').setFontWeight('bold');
   sh.getRange(r, 7, n, 1).setNumberFormat('0.##"″"').setHorizontalAlignment('center');
@@ -98,7 +99,7 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 10, n, 1).setHorizontalAlignment('center').setFontColor(T.muted);
   sh.getRange(r, 11, n, 1).setWrap(false);
   sh.getRange(r, 12, n, 1).setHorizontalAlignment('center');
-  sh.getRange(r, 13, n, 1).setNumberFormat('dd/mm/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
+  sh.getRange(r, 13, n, 1).setNumberFormat('mm/dd/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
 }
 
 function estiloCatalogo(sh) {
@@ -118,60 +119,61 @@ function estiloCatalogo(sh) {
   sh.setConditionalFormatRules(rules);
   if (sh.getFilter()) sh.getFilter().remove();
   sh.getRange(3, 1, n + 1, COLS - 1).createFilter();
-  sh.getRange(2, 1).setValue(T.sub + '  ·  ' + n + ' kits  ·  actualizado ' +
-    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm'));
+  sh.getRange(2, 1).setValue(T.sub + '  ·  ' + n + ' kits  ·  updated ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MM/dd/yyyy h:mm a'));
 }
 
 function armarHistorial(sh) {
   try { sh.setHiddenGridlines(true); } catch (e) { }
-  banda(sh, 1, 4, 'HISTORIAL DE COTIZACIONES', 'Cada vez que copias una cotización en el panel');
-  sh.getRange(3, 1, 1, 4).setValues([['Fecha', 'Vehículo', 'Mensaje del cliente', 'Cotización enviada']]);
+  banda(sh, 1, 4, 'QUOTE HISTORY', 'Every quote copied from the Rough Country panel');
+  sh.getRange(3, 1, 1, 4).setValues([['Date', 'Vehicle', 'Customer message', 'Quote sent']]);
   sh.setFrozenRows(3);
   [140, 200, 360, 420].forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.getRange(4, 1, 300, 4).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('top').setWrap(true);
-  sh.getRange(4, 1, 300, 1).setNumberFormat('dd/mm/yyyy HH:mm');
+  sh.getRange(4, 1, 300, 1).setNumberFormat('mm/dd/yyyy h:mm am/pm');
 }
 
 function armarListas(sh) {
   sh.getRange('A1').setFormula(`=IFERROR(SORT(UNIQUE(FILTER('${CAT}'!A${ROW0}:A,'${CAT}'!A${ROW0}:A<>""))),"")`);
   sh.getRange('B1').setFormula(`=IFERROR(SORT(UNIQUE(FILTER('${CAT}'!B${ROW0}:B,'${CAT}'!A${ROW0}:A='${BUS}'!C5))),"")`);
-  sh.getRange('C1:C3').setValues([['Todas'], ['4x4'], ['4x2']]);
+  sh.getRange('C1:C3').setValues([['All'], ['4x4'], ['4x2']]);
 }
 
 function armarBuscar(sh) {
   try { sh.setHiddenGridlines(true); } catch (e) { }
   const W = 7;
   [24, 120, 170, 120, 130, 420, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
-  banda(sh, 1, W, T.titulo, 'Elige el vehículo y te muestro los kits y precios');
+  banda(sh, 1, W, T.titulo, 'Pick a vehicle to see its kits and prices');
   sh.getRange(3, 1, 1, W).setBackground('#ffffff');
   sh.setRowHeight(3, 12);
 
-  const lab = [['Marca'], ['Modelo'], ['Año'], ['Tracción']];
+  const lab = [['Make'], ['Model'], ['Year'], ['Drive']];
   sh.getRange('B5:B8').setValues(lab).setFontWeight('bold').setFontColor(T.ink2).setFontFamily(T.font).setHorizontalAlignment('right');
   const inp = sh.getRange('C5:C8');
   inp.setBackground(T.accentSoft).setFontWeight('bold').setFontSize(12).setFontFamily(T.font)
     .setBorder(true, true, true, true, true, true, T.accent, SpreadsheetApp.BorderStyle.SOLID);
-  sh.getRange('C8').setValue('Todas');
+  sh.getRange('C8').setValue('All');
   const lis = libro().getSheetByName(LIS);
   sh.getRange('C5').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('A1:A500'), true).setAllowInvalid(false).build());
   sh.getRange('C6').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('B1:B500'), true).setAllowInvalid(true).build());
+  sh.getRange('C5:C6').setNumberFormat('@');
   sh.getRange('C7').setNumberFormat('0').setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1950, 2100).setAllowInvalid(false).build());
   sh.getRange('C8').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('C1:C3'), true).build());
   sh.getRange('D5:F8').setFontColor(T.muted).setFontSize(9).setFontFamily(T.font);
-  sh.getRange('D5').setValue('Toca la celda naranja y elige de la lista');
-  sh.getRange('D7').setValue('Encuentra los kits cuyo rango de años incluye este año');
+  sh.getRange('D5').setValue('Tap an orange cell and pick from the list');
+  sh.getRange('D7').setValue('Finds every kit whose year range includes this year');
 
-  sh.getRange(10, 2, 1, 6).setValues([['Tipo', 'Pulgadas', 'Precio instalado', 'Precio base RC', 'Kit en Rough Country', 'Años']])
+  sh.getRange(10, 2, 1, 6).setValues([['Type', 'Lift', 'Installed price', 'RC base price', 'Rough Country kit', 'Years']])
     .setBackground(T.ink).setFontColor('#ffffff').setFontWeight('bold').setFontFamily(T.font).setHorizontalAlignment('center');
   sh.setRowHeight(10, 28);
   const c = `'${CAT}'!`, R = (col) => `${c}${col}${ROW0}:${col}`;
   const cond =
     `${R('A')}=C5,${R('B')}=C6,` +
     `((${R('D')}="")+(${R('D')}<=C7))*((${R('E')}="")+(${R('E')}>=C7))>0,` +
-    `(C8="Todas")+(${R('C')}=C8)+(${R('C')}="4x2 / 4x4")+(${R('C')}="Todas")>0`;
+    `(C8="All")+(${R('C')}=C8)+(${R('C')}="4x2 / 4x4")+(${R('C')}="All")>0`;
   sh.getRange('B11').setFormula(
-    `=IF(OR(C5="",C6="",C7=""),"Elige marca, modelo y año arriba",` +
-    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No hay kits guardados para ese vehículo y año"))`);
+    `=IF(OR(C5="",C6="",C7=""),"Pick make, model and year above",` +
+    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No saved kits for that vehicle and year yet"))`);
   sh.getRange('B11:G200').setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
   sh.getRange('B11:C200').setHorizontalAlignment('center');
   sh.getRange('C11:C200').setNumberFormat('0.##"″"');
@@ -184,7 +186,7 @@ function armarBuscar(sh) {
 }
 
 // ---------------------------------------------------------------- recibir datos
-function doGet(e) { return json({ ok: true, msg: 'Base de datos activa' }); }
+function doGet(e) { return json({ ok: true, msg: 'Database online' }); }
 
 function doPost(e) {
   try {
@@ -205,7 +207,7 @@ function doPost(e) {
 function guardarKits(kits) {
   const ss = libro();
   const sh = ss.getSheetByName(CAT);
-  if (!sh) throw new Error('Falta la pestaña Catálogo: ejecuta crearBaseDeDatos');
+  if (!sh) throw new Error('Missing Catalog tab: run crearBaseDeDatos');
   const last = sh.getLastRow();
   const keys = last >= ROW0 ? sh.getRange(ROW0, COLS, last - ROW0 + 1, 1).getValues().map(r => String(r[0])) : [];
   const pos = {};
@@ -214,10 +216,10 @@ function guardarKits(kits) {
   const nuevos = [];
   let n = 0;
   kits.forEach(k => {
-    const row = [k.marca || '', k.modelo || '', k.traccion || 'Todas', k.desde || '', k.hasta || '',
+    const row = [k.marca || '', k.modelo || '', (k.traccion === 'Todas' ? 'All' : (k.traccion || 'All')), k.desde || '', k.hasta || '',
       k.tipo === 'leveling' ? 'Leveling' : 'Lift', +k.pulgadas || '',
-      k.instalado == null ? 'No se ofrece' : +k.instalado, +k.base || '', k.starting ? 'Sí' : '',
-      k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","Ver")' : '', now, k.clave];
+      k.instalado == null ? 'Not offered' : +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
+      k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now, k.clave];
     if (!k.clave) return;
     if (pos[k.clave]) sh.getRange(pos[k.clave], 1, 1, COLS).setValues([row]);
     else { nuevos.push(row); pos[k.clave] = -1; }
@@ -225,6 +227,7 @@ function guardarKits(kits) {
   });
   if (nuevos.length) {
     const start = Math.max(sh.getLastRow() + 1, ROW0);
+    sh.getRange(start, 1, nuevos.length, 2).setNumberFormat('@');
     sh.getRange(start, 1, nuevos.length, COLS).setValues(nuevos);
     formatoDatos(sh, start, nuevos.length);
     sh.getRange(start, 1, nuevos.length, COLS).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
@@ -244,7 +247,7 @@ function guardarHistorial(c) {
   sh.insertRowAfter(3);
   sh.getRange(4, 1, 1, 4).setValues([[new Date(), c.vehiculo || '', c.mensaje || '', c.texto || '']])
     .setBackground('#ffffff').setFontColor(T.ink).setFontWeight('normal').setFontFamily(T.font).setFontSize(10).setWrap(true).setVerticalAlignment('top');
-  sh.getRange(4, 1).setNumberFormat('dd/mm/yyyy HH:mm');
+  sh.getRange(4, 1).setNumberFormat('mm/dd/yyyy h:mm am/pm');
   sh.getRange(4, 1, 1, 4).setBorder(null, null, true, null, null, null, T.line, SpreadsheetApp.BorderStyle.SOLID);
 }
 
