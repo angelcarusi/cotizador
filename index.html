@@ -155,7 +155,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='4';
+  var V='5';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -165,7 +165,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=4"></script>
+<script src="core.js?v=5"></script>
 <script>
 (function(){
 'use strict';
@@ -248,9 +248,15 @@ function readForm(){
 }
 
 // ---------- Gemini ----------
-async function gemini(model, body){
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(cfg.key),
-    { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+let gErr = [];
+async function gemini(model, body, ms){
+  const ac = new AbortController(); const tm = setTimeout(()=>ac.abort(), ms||60000);
+  let r;
+  try{
+    r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(cfg.key),
+      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal: ac.signal });
+  }catch(e){ const x=new Error(e.name==='AbortError'?'tardó demasiado':'error de red ('+e.message+')'); x.net=true; throw x; }
+  finally{ clearTimeout(tm); }
   const j = await r.json().catch(()=>({}));
   if(!r.ok){ const e=new Error((j.error&&j.error.message)||('Gemini respondió '+r.status)); e.status=r.status; throw e; }
   const c = j.candidates && j.candidates[0];
@@ -264,14 +270,15 @@ async function geminiAny(kind, body){
     ? [cfg.chatModel,'gemini-3.6-flash','gemini-3.8-flash','gemini-flash-latest','gemini-3.5-flash-lite']
     : [cfg.chatModel,'gemini-3.8-flash','gemini-3.6-flash','gemini-flash-latest','gemini-3.5-flash-lite'];
   const list = pref.filter((m,i)=>m && pref.indexOf(m)===i);
-  let last;
+  let last; gErr = [];
   for(const m of list){
     try{
       return await gemini(m, body);
     }catch(e){
       last=e;
       const gone = e.status===404 || /not found|not supported|is not available|deprecated/i.test(e.message);
-      const busy = e.status===429 || e.status===500 || e.status===503 || /high demand|overloaded|try again|unavailable|exhausted|quota/i.test(e.message);
+      const busy = e.net || e.status===429 || e.status===500 || e.status===503 || /high demand|overloaded|try again|unavailable|exhausted|quota/i.test(e.message);
+      gErr.push(m+': '+e.message.slice(0,90));
       if(gone){
         if(kind==='parse' && m===cfg.parseModel){ cfg.parseModel=''; }
         if(kind==='chat' && m===cfg.chatModel){ cfg.chatModel=''; }
@@ -390,8 +397,10 @@ List every product shown in the product results grid. For each one give the full
 Reply ONLY with a JSON array, no other text, like:
 [{"title":"6 Inch Lift Kit | Ford F-150 4WD (2021-2026)","price":1399.95,"starting":true}]
 If the page cannot be opened, reply exactly: BLOCKED`;
-    const { text } = await geminiAny('fetch', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } });
-    diag.gemini = text.slice(0,160).replace(/\s+/g,' ');
+    let text;
+    try{ ({ text } = await geminiAny('fetch', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } })); }
+    catch(e){ diag.gemini = gErr.join(' | ') || e.message; throw e; }
+    diag.gemini = text.slice(0,200).replace(/\s+/g,' ');
     if(/^\s*BLOCKED/i.test(text)) throw new Error('no pudo abrir la página');
     const m = text.match(/\[[\s\S]*\]/);
     let arr=[]; try{ arr = m ? JSON.parse(m[0]) : []; }catch(e){ arr=[]; }
