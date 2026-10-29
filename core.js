@@ -9,11 +9,14 @@
   // match = el título del kit debe mencionar el modelo (Rough Country mezcla otros vehículos en la página)
   const MAKES = [
     ['ford', 'Ford'], ['chevy', 'Chevy'], ['gmc', 'GMC'], ['ram', 'Ram'], ['dodge', 'Dodge'],
-    ['toyota', 'Toyota'], ['jeep', 'Jeep'], ['nissan', 'Nissan']
+    ['toyota', 'Toyota'], ['jeep', 'Jeep'], ['nissan', 'Nissan'], ['honda', 'Honda'],
+    ['mercedes-benz', 'Mercedes-Benz'], ['mitsubishi', 'Mitsubishi'], ['subaru', 'Subaru']
   ];
 
   const MODELS = [
-    { mk: 'ford', md: 'f-150', label: 'F-150', alias: ['f150', 'fordf150', 'lobo'], match: /f-?150/i },
+    { mk: 'ford', md: 'f-150', label: 'F-150', alias: ['f150', 'fordf150', 'lobo'], match: /f-?150(?!\s*(lightning|raptor))/i },
+    { mk: 'ford', md: 'f-150-raptor', label: 'Raptor', alias: ['raptor', 'f150raptor'], match: /raptor/i },
+    { mk: 'ford', md: 'f-150-lightning', label: 'F-150 Lightning', alias: ['lightning', 'f150lightning'], match: /lightning/i },
     { mk: 'ford', md: 'f-250-super-duty', label: 'F-250 Super Duty', alias: ['f250', 'f250superduty', 'superduty250'], match: /f-?250|super ?duty/i },
     { mk: 'ford', md: 'f-350-super-duty', label: 'F-350 Super Duty', alias: ['f350', 'f350superduty', 'superduty350'], match: /f-?350|super ?duty/i },
     { mk: 'ford', md: 'ranger', label: 'Ranger', alias: ['fordranger', 'ranger'], match: /ranger/i },
@@ -147,8 +150,10 @@
     const low = t.toLowerCase();
     const kind = /level/.test(low) ? 'leveling' : (/lift kit/.test(low) ? 'lift' : null);
     let inches = null;
+    const fr = t.match(/(?:(\d+)[\s-]+)?(\d+)\s*\/\s*(\d+)\s*(?:inch\b|in\b|"|”)/i);
     const m = t.match(/(?:(\d+(?:\.\d+)?)\s*-\s*)?(\d+(?:\.\d+)?)\s*(?:inch\b|in\b|"|”)/i);
-    if (m) inches = parseFloat(m[2]);
+    if (fr && (!m || fr.index <= m.index)) inches = (fr[1] ? +fr[1] : 0) + (+fr[2] / +fr[3]);
+    else if (m) inches = parseFloat(m[2]);
     const drives = new Set();
     (t.match(/\b(2WD|4WD|4X4|4X2|RWD|AWD)\b/gi) || []).forEach(d => {
       d = d.toUpperCase();
@@ -323,4 +328,4 @@
   const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, slugify, squash };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Core = api;
-})(this);
+})(typeof globalThis !== 'undefined' ? globalThis : this);

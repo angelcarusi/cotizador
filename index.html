@@ -124,9 +124,6 @@ details li{margin:3px 0}
 <!-- ============ AJUSTES ============ -->
 <main id="viewS" hidden>
   <div class="card">
-    <label class="f" for="sBridge">Enlace del puente (Google Apps Script)</label>
-    <input id="sBridge" placeholder="https://script.google.com/macros/s/…/exec">
-    <div style="height:10px"></div>
     <label class="f" for="sKey">Clave de Gemini (API key)</label>
     <input id="sKey" placeholder="AIza…" autocomplete="off">
     <div style="height:10px"></div>
@@ -138,14 +135,19 @@ details li{margin:3px 0}
     <label class="f">Buscar en internet en Consultas</label>
     <div class="chips" id="sWeb"><button data-v="1">Sí</button><button data-v="0">No</button></div>
     <div class="row">
-      <button class="btn" id="test">Probar conexión</button>
+      <button class="btn" id="test">Probar Gemini</button>
       <button class="btn main" id="save">Guardar</button>
     </div>
     <div id="testOut" class="help" style="margin-top:8px"></div>
   </div>
   <div class="card help">
-    <b>Dónde se guarda esto:</b> solo en este teléfono. El enlace del puente y la clave no se suben a internet.<br><br>
-    Cada vez que copias una cotización se anota en la hoja de Google «Cotizador - historial» de tu cuenta.
+    <b>Instalar el script de Rough Country (una vez, en Firefox):</b>
+    <ol>
+      <li>Instala la extensión <b>Tampermonkey</b> en Firefox (menú ⋮ → Complementos).</li>
+      <li>Toca este enlace y luego <b>Instalar</b>: <a href="cotizador.user.js">cotizador.user.js</a></li>
+      <li>Listo: al tocar Cotizar se abre Rough Country con la cotización encima.</li>
+    </ol>
+    La clave de Gemini se guarda solo en este teléfono.
   </div>
   <div class="row"><button class="btn" id="closeSet">Volver</button></div>
 </main>
@@ -155,7 +157,7 @@ details li{margin:3px 0}
 <script>
 // Se actualiza sola: si hay una versión nueva publicada, recarga sin caché.
 (function(){
-  var V='5';
+  var V='6';
   try{
     fetch('version.txt?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():''}).then(function(t){
       t=(t||'').trim();
@@ -165,7 +167,7 @@ details li{margin:3px 0}
   }catch(e){}
 })();
 </script>
-<script src="core.js?v=5"></script>
+<script src="core.js?v=6"></script>
 <script>
 (function(){
 'use strict';
@@ -209,7 +211,7 @@ function chips(id, onChange){
 }
 const drv = chips('#drv', () => search());
 const knd = chips('#knd', () => search());
-const lng = chips('#lng', v => { LS.set('lang', v); if(lastQ) { lastQ.lang = langNow(); render(lastQ, lastItems); } });
+const lng = chips('#lng', v => LS.set('lang', v));
 lng.set(LS.get('lang','auto'));
 const langNow = () => { const v = lng.get(); return v==='auto' ? (C.isSpanish($('#msg').value) ? 'es' : 'en') : v; };
 const web = chips('#sWeb');
@@ -323,262 +325,32 @@ async function aiParse(msg){
   };
 }
 
-// ---------- Leer Rough Country ----------
-// Tres caminos; la app recuerda el último que funcionó.
-//  lector: servicio r.jina.ai, directo desde el teléfono (HTML y, si no, texto)
-//  puente: tu Google Apps Script
-//  gemini: Gemini abre la página y devuelve la lista
-class NotFound extends Error {}
-const diag = {};
-const parseDoc = html => new DOMParser().parseFromString(html, 'text/html');
-const blockedText = t => /access denied|attention required|captcha|cf-error|request blocked|forbidden|are you a robot|verify you are human|unusual traffic|pardon our interruption|incapsula|perimeterx|px-captcha/i.test(String(t).slice(0,8000));
-const notFoundText = t => /page not found|404 not found|we can.?t find|couldn.?t find the page/i.test(String(t).slice(0,8000)) && !/Filter Results/i.test(t);
-function sniff(route, status, body){
-  const t = String(body||'');
-  const title = (t.match(/<title[^>]*>([^<]*)<\/title>/i)||t.match(/^Title:\s*(.*)$/m)||[,''])[1].trim();
-  const text = t.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-  diag[route] = `HTTP ${status} · ${t.length} car. · título: "${title.slice(0,70)}" · "${text.slice(0,140)}"`;
+// ---------- Abrir Rough Country ----------
+// Rough Country bloquea a los servidores, así que la página la abre tu navegador
+// y el script de Tampermonkey calcula la cotización encima.
+let lastMsg = '';
+function rcUrl(q){
+  const data = { mk:q.model.mk, md:q.model.md, label:q.model.label, y:q.year, d:q.drive, i:q.inches, k:q.kind, l:q.lang };
+  return `https://www.roughcountry.com/lift-kits/${q.model.mk}/${q.model.md}/${q.year}#cot=${encodeURIComponent(JSON.stringify(data))}`;
 }
-
-async function bridgeHtml(url, raw){
-  if(!cfg.bridge) throw new Error('sin puente');
-  const r = await fetch(cfg.bridge + '?url=' + encodeURIComponent(url) + (raw?'&raw=1':''));
-  const j = await r.json().catch(()=>null);
-  if(!j) throw new Error('el puente no respondió bien');
-  if(j.status===404) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
-  if(!j.ok) throw new Error(j.status ? 'Rough Country respondió '+j.status+' al puente' : (j.error||'error del puente'));
-  return j.html;
-}
-async function readerGet(url, format){
-  const h = { 'X-No-Cache':'true' };
-  if(format) h['X-Return-Format'] = format;
-  const r = await fetch('https://r.jina.ai/' + url, { headers: h });
-  const t = await r.text();
-  sniff('lector'+(format?'-'+format:''), r.status, t);
-  if(r.status===404 || notFoundText(t)) throw new NotFound('Rough Country no tiene esa página (revisa modelo y año).');
-  if(!r.ok) throw new Error('respondió '+r.status);
-  if(blockedText(t) && !/Starting at|Filter Results/i.test(t)) throw new Error('Rough Country lo bloqueó');
-  return t;
-}
-
-async function itemsFromHtmlRoute(get, url){
-  const html = await get(url);
-  const first = C.parseListing(parseDoc(html));
-  let items = first.items;
-  if(first.pages.length){
-    const extra = await Promise.all(first.pages.slice(0,5).map(p => get(p).then(h=>C.parseListing(parseDoc(h)).items).catch(()=>[])));
-    extra.forEach(x => items = items.concat(x));
-  }
-  return { items, html };
-}
-
-const ROUTES = {
-  async lector(url){
-    let errs = [];
-    try{
-      const { items, html } = await itemsFromHtmlRoute(u => readerGet(u, 'html'), url);
-      if(items.length || /Filter Results:\s*0\b/i.test(html)) return items;
-      errs.push('html sin productos');
-    }catch(e){ if(e instanceof NotFound) throw e; errs.push('html: '+e.message); }
-    const md = await readerGet(url, '');
-    const items = C.parseText(md);
-    if(items.length) return items;
-    throw new Error(errs.concat('texto sin productos').join(', '));
-  },
-  async puente(url){
-    const { items, html } = await itemsFromHtmlRoute(u => bridgeHtml(u), url);
-    sniff('puente', 200, html);
-    if(!items.length && !/Filter Results/i.test(html)) throw new Error('sin productos');
-    return items;
-  },
-  async gemini(url){
-    const prompt = `Open this page: ${url}
-List every product shown in the product results grid. For each one give the full product name exactly as written on the page (keep the " | " separators, the drive type and the years), the price as a number, and starting=true if the price says "Starting at".
-Reply ONLY with a JSON array, no other text, like:
-[{"title":"6 Inch Lift Kit | Ford F-150 4WD (2021-2026)","price":1399.95,"starting":true}]
-If the page cannot be opened, reply exactly: BLOCKED`;
-    let text;
-    try{ ({ text } = await geminiAny('fetch', { contents:[{ role:'user', parts:[{ text: prompt }] }], tools:[{ url_context:{} }], generationConfig:{ temperature:0 } })); }
-    catch(e){ diag.gemini = gErr.join(' | ') || e.message; throw e; }
-    diag.gemini = text.slice(0,200).replace(/\s+/g,' ');
-    if(/^\s*BLOCKED/i.test(text)) throw new Error('no pudo abrir la página');
-    const m = text.match(/\[[\s\S]*\]/);
-    let arr=[]; try{ arr = m ? JSON.parse(m[0]) : []; }catch(e){ arr=[]; }
-    const items = arr.filter(x => x && typeof x.title==='string' && +x.price>0).map(x => ({ title: x.title.replace(/\s+/g,' ').trim(), price: +x.price, starting: !!x.starting, url: null }));
-    if(!items.length) throw new Error('no devolvió productos');
-    return items;
-  }
-};
-function routeOrder(){
-  const all = ['lector','puente','gemini'].filter(r => (r!=='puente'||cfg.bridge) && (r!=='gemini'||cfg.key));
-  if(cfg.route && all.includes(cfg.route)) all.unshift(...all.splice(all.indexOf(cfg.route),1));
-  return all;
-}
-
-let lastRoute = '';
-async function loadListing(url){
-  const errs=[];
-  for(const r of routeOrder()){
-    try{
-      const items = await ROUTES[r](url);
-      if(cfg.route!==r){ cfg.route=r; saveCfg(); }
-      lastRoute = r;
-      return items;
-    }catch(e){
-      if(e instanceof NotFound) throw e;
-      errs.push(r+': '+e.message);
-    }
-  }
-  throw new Error('No pude leer Rough Country ('+errs.join('; ')+').');
-}
-
-// HTML de una página de producto (para amortiguadores)
-async function getHtml(url, raw){
-  const errs=[];
-  for(const r of ['lector','puente'].filter(x => x!=='puente' || cfg.bridge)){
-    try{ return r==='lector' ? await readerGet(url, 'html') : await bridgeHtml(url, raw); }
-    catch(e){ errs.push(r+': '+e.message); }
-  }
-  throw new Error('No pude abrir la página del kit ('+errs.join('; ')+').');
-}
-
-// ---------- Cotizar ----------
-let runId = 0, lastQ = null, lastItems = [], lastMsg = '';
-const extras = LS.get('extras', {}); // precio extra por amortiguadores, por kit
-
-function vehicleUrl(q){ return `https://www.roughcountry.com/lift-kits/${q.model.mk}/${q.model.md}/${q.year}`; }
-function vehicleName(q){ return `${C.makeLabel(q.model.mk)} ${q.model.label} ${q.year}`; }
-
-async function search(){
+function check(){
   const q = readForm();
   ['#md','#yr'].forEach(s=>$(s).classList.remove('miss'));
   if(!q.model || !q.year){
     if(!q.model) $('#md').classList.add('miss');
     if(!q.year) $('#yr').classList.add('miss');
     status(!q.model && !q.year ? 'Falta modelo y año.' : (!q.model ? 'Falta el modelo.' : 'Falta el año.'), true);
-    return;
+    return null;
   }
-  const id = ++runId;
-  const url = vehicleUrl(q);
-  const cached = LS.get('c:'+url, null);
-  if(cached){
-    render(q, cached.items);
-    status('Precios guardados ' + ago(cached.ts) + ' · actualizando…');
-  } else {
-    $('#results').innerHTML='';
-    status('Buscando en Rough Country…');
-  }
-  try{
-    const items = await loadListing(url);
-    if(id!==runId) return;
-    LS.set('c:'+url, { ts: Date.now(), items });
-    render(q, items);
-    status(items.length ? 'Precios al día · ' + vehicleName(q) + ' · vía ' + lastRoute : 'Rough Country no muestra kits para ese vehículo y año.', !items.length);
-  }catch(e){
-    if(id!==runId) return;
-    status((cached ? 'No pude actualizar, uso los precios guardados. ' : '') + e.message, true);
-  }
+  return q;
 }
-function ago(ts){
-  const m = Math.round((Date.now()-ts)/60000);
-  if(m<1) return 'hace un momento'; if(m<60) return 'hace '+m+' min';
-  const h=Math.round(m/60); if(h<48) return 'hace '+h+' h';
-  return 'hace '+Math.round(h/24)+' días';
-}
-
-function render(q, items){
-  lastQ=q; lastItems=items;
-  const withExtra = items.map(it => Object.assign({}, it, { extra: extras[it.url||it.title] || 0 }));
-  const res = C.buildQuote(withExtra, q);
-  const out = $('#results');
-  out.innerHTML='';
-  res.blocks.forEach(b=>{
-    const card=document.createElement('div'); card.className='card block';
-    const title = vehicleName(q) + ' · ' + (b.drive==='4WD'?'4x4':'4x2');
-    let html = `<h3>${esc(title)}</h3>`;
-    if(!b.kits.length){
-      const sizes=[...new Set(b.sizes.map(k=>(k.kind==='leveling'?'leveling ':'lift ')+C.inchStr(k.inches)+'"'))];
-      html += `<div class="help">${q.inches!=null||q.kind ? 'No hay ese kit para esta camioneta.' : 'No hay kits para esta tracción.'}${sizes.length?' Disponibles: '+esc(sizes.join(', '))+'.':''}</div>`;
-      card.innerHTML=html; out.appendChild(card); return;
-    }
-    html += `<pre class="out">${esc(b.text)}</pre><button class="btn main" style="width:100%" data-copy>Copiar</button><div class="kits">`;
-    b.kits.forEach((k,i)=>{
-      const key=k.url||k.title;
-      html += `<div class="kit"><div class="t"><b>${C.inchStr(k.inches)}" ${k.kind==='leveling'?'leveling':'lift'}</b> · base ${C.money(k.price)}${k.extra?` + ${C.money(k.extra)} amort.`:''}${k.starting?' (desde)':''} → ${C.money(k.sale)}<br><span>${esc(k.title)}</span>${k.url?` · <a href="${esc(k.url)}" target="_blank" rel="noopener">ver</a>`:''}</div>${k.kind==='lift'?`<button data-shock="${esc(key)}" data-url="${esc(k.url||'')}">Amort.</button>`:''}</div><div class="shocks" data-for="${esc(key)}" hidden></div>`;
-    });
-    html += `</div>`;
-    card.innerHTML=html;
-    card.querySelector('[data-copy]').onclick = () => copy(b.text, title);
-    card.querySelectorAll('[data-shock]').forEach(btn => btn.onclick = () => shocks(card, btn.dataset.shock, btn.dataset.url));
-    out.appendChild(card);
-  });
-  if(res.others.length){
-    const d=document.createElement('details');
-    d.innerHTML = `<summary>${res.others.length} kits de la página que no son de este vehículo o año (no se cotizan)</summary><ul>${res.others.map(k=>`<li>${esc(k.title)} · ${C.money(k.price)}</li>`).join('')}</ul>`;
-    out.appendChild(d);
-  }
-}
-
-async function copy(text, vehicle){
-  let ok=false;
-  try{ await navigator.clipboard.writeText(text); ok=true; }catch(e){
-    const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
-    try{ ok=document.execCommand('copy'); }catch(_){} ta.remove();
-  }
-  toast(ok?'Copiado':'No se pudo copiar, mantén presionado el texto');
-  if(ok && cfg.bridge){
-    const log = JSON.stringify({ v: vehicle, m: lastMsg.slice(0,600), r: text.slice(0,900) });
-    fetch(cfg.bridge + '?log=' + encodeURIComponent(log)).catch(()=>{});
-  }
-}
-
-// amortiguadores (opcional)
-async function shocks(card, key, url){
-  const box = [...card.querySelectorAll('.shocks')].find(x=>x.dataset.for===key);
-  if(!box) return;
-  if(!box.hidden){ box.hidden=true; return; }
-  box.hidden=false;
-  const cur = extras[key]||0;
-  const manual = `<div class="row" style="margin-top:6px"><input inputmode="decimal" placeholder="Extra $ (precio del upgrade)" value="${cur||''}" data-manual><button class="btn" data-apply style="flex:0 0 auto">Aplicar</button></div>`;
-  box.innerHTML = '<div class="help">Buscando opciones…</div>' + manual;
-  wireManual(box, key);
-  if(!url) { box.querySelector('.help').textContent='Escribe el precio extra del amortiguador:'; return; }
-  try{
-    const doc = parseDoc(await getHtml(url, true));
-    const opts = shockOptions(doc);
-    if(!opts.length){ box.querySelector('.help').textContent='No encontré las opciones en la página. Escribe el precio extra:'; return; }
-    box.innerHTML = '<div class="chips">' + [{name:'Básico (incluido)', add:0}].concat(opts).map(o=>`<button data-add="${o.add}" class="${Math.abs(o.add-cur)<.01?'on':''}">${esc(o.name)}${o.add?' +'+C.money(o.add):''}</button>`).join('') + '</div>' + manual;
-    box.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>setExtra(key, +b.dataset.add));
-    wireManual(box, key);
-  }catch(e){ box.querySelector('.help').textContent = e.message + ' Escribe el precio extra:'; }
-}
-function wireManual(box, key){
-  const inp=box.querySelector('[data-manual]'), ap=box.querySelector('[data-apply]');
-  if(ap) ap.onclick = () => setExtra(key, parseFloat((inp.value||'0').replace(/[$,]/g,''))||0);
-}
-function setExtra(key, add){
-  if(add) extras[key]=add; else delete extras[key];
-  LS.set('extras', extras);
-  render(lastQ, lastItems);
-}
-function shockOptions(doc){
-  const seen=new Map();
-  if(!doc.body) return [];
-  const lines = [];
-  const w = doc.createTreeWalker(doc.body, 4); let n;
-  while((n=w.nextNode())){ const t=n.nodeValue.replace(/\s+/g,' ').trim(); if(t) lines.push(t); }
-  const joined = lines.join('\n');
-  const re = /([A-Za-z0-9][A-Za-z0-9 .,'\/\-]{1,48}?)\s*\+\s*\$\s*([\d,]+\.\d{2})/g; let m;
-  while((m=re.exec(joined))){
-    const name=m[1].trim().replace(/\s+/g,' '); const add=parseFloat(m[2].replace(/,/g,''));
-    if(add>0 && add<5000 && !seen.has(name)) seen.set(name, add);
-  }
-  // también en <option> de selects
-  doc.querySelectorAll('option').forEach(o=>{
-    const t=o.textContent.replace(/\s+/g,' ').trim(); const p=t.match(/^(.*?)\s*\+\s*\$\s*([\d,]+\.\d{2})/);
-    if(p && !seen.has(p[1])) seen.set(p[1].trim(), parseFloat(p[2].replace(/,/g,'')));
-  });
-  return [...seen].map(([name,add])=>({name,add})).slice(0,8);
+function search(){ const q = check(); if(q) status(''); }
+function openRC(){
+  const q = check(); if(!q) return;
+  const url = rcUrl(q);
+  status('Abriendo Rough Country · ' + C.makeLabel(q.model.mk) + ' ' + q.model.label + ' ' + q.year + '…');
+  $('#results').innerHTML = `<a class="btn main" style="display:block;text-align:center;text-decoration:none" href="${esc(url)}">Abrir Rough Country</a>`;
+  location.assign(url);
 }
 
 // ---------- Botones principales ----------
@@ -590,7 +362,7 @@ $('#go').onclick = () => go();
 
 async function go(){
   const msg = $('#msg').value.trim();
-  if(!msg){ search(); return; }
+  if(!msg){ openRC(); return; }
   lastMsg = msg;
   const p = C.localParse(msg);
   // si la app sola entendió modelo y año, no espera a Gemini
@@ -604,7 +376,7 @@ async function go(){
     status('Para mensajes complicados agrega la clave de Gemini en Ajustes ⚙︎', true);
   }
   setForm(p);
-  search();
+  openRC();
 }
 
 // ---------- Consultas ----------
@@ -647,11 +419,11 @@ $('#send').onclick = async () => {
 
 // ---------- Ajustes ----------
 function fillSettings(){
-  $('#sBridge').value=cfg.bridge; $('#sKey').value=cfg.key;
+  $('#sKey').value=cfg.key;
   $('#sPm').value=cfg.parseModel; $('#sCm').value=cfg.chatModel; web.set(cfg.web?'1':'0');
 }
 function readSettings(){
-  cfg.bridge=$('#sBridge').value.trim(); cfg.key=$('#sKey').value.trim();
+  cfg.key=$('#sKey').value.trim();
   cfg.parseModel=$('#sPm').value.trim()||DEF.parseModel; cfg.chatModel=$('#sCm').value.trim()||DEF.chatModel;
   cfg.web = web.get()!=='0';
 }
@@ -660,21 +432,16 @@ $('#test').onclick = async () => {
   readSettings(); saveCfg();
   const o=$('#testOut'); o.textContent='Probando…';
   const lines=[];
-  try{
-    const items = await loadListing('https://www.roughcountry.com/lift-kits/ford/f-150/2024');
-    lines.push(items.length ? `✓ Rough Country: ${items.length} kits leídos de la F-150 2024 (vía ${lastRoute}).` : '✗ Abrí la página pero no leí kits de Rough Country.');
-  }catch(e){ lines.push('✗ '+e.message); }
   if(cfg.key){
     try{ await geminiAny('parse', { contents:[{role:'user',parts:[{text:'Reply with the word OK'}]}] }); lines.push('✓ Gemini funciona ('+cfg.parseModel+').'); }
     catch(e){ lines.push('✗ Gemini: '+e.message); }
   } else lines.push('· Sin clave de Gemini (opcional para mensajes simples).');
-  Object.keys(diag).forEach(k => lines.push('· '+k+': '+diag[k]));
   o.innerHTML = lines.map(esc).join('<br>');
 };
 
 // inicio
 drawChat();
-if(!cfg.bridge && !cfg.key && !LS.get('seen',0)) { LS.set('seen',1); show('S'); }
+if(!cfg.key && !LS.get('seen2',0)) { LS.set('seen2',1); show('S'); }
 })();
 </script>
 </body>
