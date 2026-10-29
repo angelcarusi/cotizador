@@ -25,6 +25,10 @@ const T = {
   font: 'Roboto'
 };
 
+// ID de tu Google Sheet (lo que va entre /d/ y /edit en su enlace)
+const SHEET_ID = '1KfC2RsAekVtyfL9du3neXsj22CDS-iDbwFEnNChfrk0';
+function libro() { return SpreadsheetApp.getActive() || SpreadsheetApp.openById(SHEET_ID); }
+
 const CAT = 'Catálogo', BUS = 'Buscar', HIS = 'Historial', LIS = 'Listas';
 const HEAD = ['Marca', 'Modelo', 'Tracción', 'Año desde', 'Año hasta', 'Tipo', 'Pulgadas',
   'Precio instalado', 'Precio base RC', 'Precio "desde"', 'Kit en Rough Country', 'Enlace', 'Actualizado', 'Clave'];
@@ -33,7 +37,7 @@ const COLS = HEAD.length;
 
 // ---------------------------------------------------------------- crear
 function crearBaseDeDatos() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = libro();
   ss.setSpreadsheetTimeZone(Session.getScriptTimeZone());
   ss.rename('Cheap on Tires · Lista de precios');
 
@@ -53,10 +57,8 @@ function crearBaseDeDatos() {
   armarBuscar(bus);
   estiloCatalogo(cat);
   lis.hideSheet();
-  ss.setActiveSheet(bus);
-  ss.moveActiveSheet(1);
-  ss.setActiveSheet(cat);
-  ss.moveActiveSheet(2);
+  ss.setActiveSheet(bus); ss.moveActiveSheet(1);
+  ss.setActiveSheet(cat); ss.moveActiveSheet(2);
   ss.setActiveSheet(bus);
 }
 
@@ -149,7 +151,7 @@ function armarBuscar(sh) {
   inp.setBackground(T.accentSoft).setFontWeight('bold').setFontSize(12).setFontFamily(T.font)
     .setBorder(true, true, true, true, true, true, T.accent, SpreadsheetApp.BorderStyle.SOLID);
   sh.getRange('C8').setValue('Todas');
-  const lis = SpreadsheetApp.getActive().getSheetByName(LIS);
+  const lis = libro().getSheetByName(LIS);
   sh.getRange('C5').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('A1:A500'), true).setAllowInvalid(false).build());
   sh.getRange('C6').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('B1:B500'), true).setAllowInvalid(true).build());
   sh.getRange('C7').setNumberFormat('0').setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1950, 2100).setAllowInvalid(false).build());
@@ -200,7 +202,7 @@ function doPost(e) {
 }
 
 function guardarKits(kits) {
-  const ss = SpreadsheetApp.getActive();
+  const ss = libro();
   const sh = ss.getSheetByName(CAT);
   if (!sh) throw new Error('Falta la pestaña Catálogo: ejecuta crearBaseDeDatos');
   const last = sh.getLastRow();
@@ -236,7 +238,7 @@ function guardarKits(kits) {
 }
 
 function guardarHistorial(c) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(HIS);
+  const sh = libro().getSheetByName(HIS);
   if (!sh) return;
   sh.insertRowAfter(3);
   sh.getRange(4, 1, 1, 4).setValues([[new Date(), c.vehiculo || '', c.mensaje || '', c.texto || '']])
