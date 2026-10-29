@@ -43,7 +43,10 @@ function crearBaseDeDatos() {
 
   // borrar todo
   const tmp = ss.insertSheet('_tmp' + Date.now());
+  ss.getSheets().forEach(s => { if (s.getSheetId() !== tmp.getSheetId()) { try { s.getRange(1, 1, s.getMaxRows(), s.getMaxColumns()).clearDataValidations(); } catch (e) { } } });
+  SpreadsheetApp.flush();
   ss.getSheets().forEach(s => { if (s.getSheetId() !== tmp.getSheetId()) ss.deleteSheet(s); });
+  SpreadsheetApp.flush();
 
   const cat = ss.insertSheet(CAT);
   const bus = ss.insertSheet(BUS);
