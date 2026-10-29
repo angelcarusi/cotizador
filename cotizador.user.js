@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.2.0
+// @version      1.2.1
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
@@ -19,7 +19,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 3; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 4; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -224,11 +224,15 @@
   }
   run();
 
-  // aviso de versión nueva
+  // aviso de versión nueva (prueba con Tampermonkey y, si no, con fetch normal)
+  function checkUpdate(t) {
+    const v = parseInt(String(t || '').trim(), 10);
+    if (v > SCRIPT_V) $('#upd').hidden = false;
+  }
+  const vurl = APP + 'script-version.txt?t=' + Date.now();
+  let checked = false;
   try {
-    GM_xmlhttpRequest({ method: 'GET', url: APP + 'script-version.txt?t=' + Date.now(), onload: r => {
-      const v = parseInt(String(r.responseText || '').trim(), 10);
-      if (v > SCRIPT_V) $('#upd').hidden = false;
-    } });
+    GM_xmlhttpRequest({ method: 'GET', url: vurl, onload: r => { checked = true; checkUpdate(r.responseText); } });
   } catch (e) { }
+  setTimeout(() => { if (!checked) fetch(vurl, { cache: 'no-store' }).then(r => r.text()).then(checkUpdate).catch(() => { }); }, 2500);
 })();
