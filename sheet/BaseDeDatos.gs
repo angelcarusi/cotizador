@@ -51,11 +51,13 @@ function crearBaseDeDatos() {
   const lis = ss.insertSheet(LIS);
   ss.deleteSheet(tmp);
 
-  armarCatalogo(cat);
-  armarHistorial(his);
-  armarListas(lis);
-  armarBuscar(bus);
-  estiloCatalogo(cat);
+  const paso = f => { SpreadsheetApp.flush(); Utilities.sleep(800); for (let i = 0; i < 3; i++) { try { return f(); } catch (e) { if (i === 2) throw e; Utilities.sleep(2500); } } };
+  paso(() => armarCatalogo(cat));
+  paso(() => armarHistorial(his));
+  paso(() => armarListas(lis));
+  paso(() => armarBuscar(bus));
+  paso(() => estiloCatalogo(cat));
+  SpreadsheetApp.flush();
   lis.hideSheet();
   ss.setActiveSheet(bus); ss.moveActiveSheet(1);
   ss.setActiveSheet(cat); ss.moveActiveSheet(2);
@@ -82,8 +84,8 @@ function armarCatalogo(sh) {
   const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 10];
   widths.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.hideColumns(COLS);
-  formatoDatos(sh, ROW0, 1000);
-  sh.getRange(ROW0, 1, 1000, COLS).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
+  formatoDatos(sh, ROW0, 300);
+  sh.getRange(ROW0, 1, 300, COLS).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
 }
 
 function formatoDatos(sh, r, n) {
@@ -126,8 +128,8 @@ function armarHistorial(sh) {
   sh.getRange(3, 1, 1, 4).setValues([['Fecha', 'Vehículo', 'Mensaje del cliente', 'Cotización enviada']]);
   sh.setFrozenRows(3);
   [140, 200, 360, 420].forEach((w, i) => sh.setColumnWidth(i + 1, w));
-  sh.getRange(4, 1, 1000, 4).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('top').setWrap(true);
-  sh.getRange(4, 1, 1000, 1).setNumberFormat('dd/mm/yyyy HH:mm');
+  sh.getRange(4, 1, 300, 4).setFontFamily(T.font).setFontSize(10).setVerticalAlignment('top').setWrap(true);
+  sh.getRange(4, 1, 300, 1).setNumberFormat('dd/mm/yyyy HH:mm');
 }
 
 function armarListas(sh) {
