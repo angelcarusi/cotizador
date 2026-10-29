@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.4.1
+// @version      1.5.0
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
-// @require      https://angelcarusi.github.io/cotizador/core.js?v=11
+// @require      https://angelcarusi.github.io/cotizador/core.js?v=12
 // @grant        GM_setClipboard
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 8; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 9; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -79,6 +79,8 @@
     .msg{color:#9aa3ab;font-size:13px;margin-top:8px}
     .warn{color:#ffa94d}
     .kits{font-size:12px;color:#9aa3ab;margin-top:6px}
+    .alert{background:#3a0d0d;border:1px solid #e03131;color:#ff6b6b;font-weight:800;border-radius:10px;padding:8px 10px;margin:8px 0;font-size:14px}
+    .alert span{display:block;font-weight:500;color:#ffc9c9;font-size:12px;margin-top:3px}
     .it{margin-top:8px;background:#14171a;border:1px solid #30363c;border-radius:10px;padding:8px 10px;font-size:13px;color:#c5ccd6}
     .it .itt{font-weight:700;color:#e8eaec;margin-bottom:3px}
     .it b{color:#ffa94d;font-weight:600}
@@ -97,6 +99,7 @@
     <div class="chips" id="drv"><button data-v="4WD">4x4</button><button data-v="2WD">4x2</button><button data-v="">Ambas</button></div>
     <div class="chips" id="lng"><button data-v="en">Inglés</button><button data-v="es">Español</button></div>
     <div class="chips"><input id="inch" inputmode="decimal" placeholder='Pulg.'><span id="kndBox"></span></div>
+    <div class="chips"><input id="ver" placeholder="Versión del cliente (ZR2, Trail Boss, diesel…)" style="width:100%"></div>
     <div id="out"><div class="msg">Leyendo los kits de esta página…</div></div>
     <div class="msg" id="db"></div>
     <div class="msg" id="upd" hidden><a href="${APP}cotizador.user.js">Hay una versión nueva del script: toca aquí y luego Actualizar</a></div>
@@ -121,6 +124,9 @@
   chips('#lng', 'lang');
   const inch = $('#inch');
   if (st.inches != null) inch.value = C.inchStr(st.inches);
+  const ver = $('#ver');
+  ver.value = req.m || '';
+  ver.addEventListener('input', () => render());
   inch.addEventListener('input', () => { const v = parseFloat(inch.value.replace(',', '.')); st.inches = v > 0 && v <= 12 ? v : null; render(); });
   if (st.kind) $('#kndBox').innerHTML = `<button class="on" id="kndX">${st.kind === 'leveling' ? 'Solo leveling' : 'Solo lift'} ✕</button>`;
   root.addEventListener('click', e => { if (e.target.id === 'kndX') { st.kind = null; $('#kndBox').innerHTML = ''; render(); } });
@@ -167,6 +173,13 @@
         if (n.higher != null) parts.push(C.inchStr(n.higher) + '" (mayor)');
         html += `<div class="msg warn">No hay ${C.inchStr(n.asked)}" para este vehículo. Te pongo ${parts.length > 1 ? 'los más cercanos' : 'el más cercano'}: ${parts.join(' y ')}.</div>`;
       }
+      const vtxt = ver.value || '';
+      const byPhrase = {};
+      b.kits.forEach(k => { if (!k.url || !NOTES[k.url]) return; C.fitmentAlerts(NOTES[k.url], vtxt).forEach(a => { (byPhrase[a.phrase] = byPhrase[a.phrase] || { note: a.note, kits: [] }).kits.push(C.inchStr(k.inches) + '" ' + k.kind + ' kit'); }); });
+      Object.keys(byPhrase).forEach(ph => {
+        const x = byPhrase[ph];
+        html += `<div class="alert">⚠ El cliente menciona "${esc(ph)}": NO le sirve${x.kits.length > 1 ? 'n' : ''} el ${esc(x.kits.join(', el '))}.<span>Rough Country: ${esc(x.note)}</span></div>`;
+      });
       html += `<pre>${esc(b.text)}</pre><button class="copy" data-b="${bi}">Copiar</button>`;
       const times = b.kits.map(k => { const t = k.url && IT[k.url]; return `<div>${C.inchStr(k.inches)}" ${k.kind}: <b>${t ? esc(t) : (k.url && !(k.url in IT) ? 'buscando…' : '—')}</b></div>`; }).join('');
       html += `<div class="it"><div class="itt">⏱ Tiempo de instalación aprox.</div>${times}</div><div class="kits">`;
@@ -276,12 +289,12 @@
   // ---------- tiempo de instalación (sale en la página de cada kit) ----------
   // Se busca en segundo plano, de 2 en 2, primero los kits del bloque para copiar.
   // Se guarda en el teléfono 30 días para no volver a abrir la misma página.
-  const IT = {};
+  const IT = {}, NOTES = {};
   let itCache = {};
   try { itCache = GM_getValue('installTimes', {}) || {}; } catch (e) { itCache = {}; }
   if (typeof itCache !== 'object' || Array.isArray(itCache)) itCache = {};
   const DAY = 864e5;
-  Object.keys(itCache).forEach(u => { const c = itCache[u]; if (c && Date.now() - c.ts < 30 * DAY && c.t) IT[u] = c.t; });
+  Object.keys(itCache).forEach(u => { const c = itCache[u]; if (c && Date.now() - c.ts < 30 * DAY && Array.isArray(c.n)) { IT[u] = c.t || ''; NOTES[u] = c.n; } });
   function parseInstall(html) {
     const j = String(html).match(/"pr_install_time"\s*:\s*"([^"]{1,40})"/i);
     if (j && j[1].trim()) return j[1].replace(/\\u002F/gi, '/').trim();
@@ -301,10 +314,10 @@
     const worker = async () => {
       while (todo.length) {
         const u = todo.shift();
-        let t = '';
-        try { t = parseInstall(await fetch(u, { credentials: 'include' }).then(r => r.ok ? r.text() : '')); } catch (e) { t = ''; }
-        IT[u] = t;
-        itCache[u] = { t, ts: Date.now() };
+        let t = '', n = [];
+        try { const html = await fetch(u, { credentials: 'include' }).then(r => r.ok ? r.text() : ''); t = parseInstall(html); n = C.fitmentNotes(html); } catch (e) { t = ''; n = []; }
+        IT[u] = t; NOTES[u] = n;
+        itCache[u] = { t, n, ts: Date.now() };
         render();
       }
     };

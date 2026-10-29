@@ -356,6 +356,45 @@
     return items;
   }
 
+  // ---------- Fitment notes ("Does NOT fit ZR2 models…") ----------
+  function fitmentNotes(html) {
+    const s = String(html || '').replace(/\\u003c/gi, '<').replace(/\\u003e/gi, '>').replace(/\\"/g, '"');
+    const out = [];
+    const re = /<li[^>]*>([\s\S]*?)<\/li>/gi; let m;
+    while ((m = re.exec(s))) {
+      const t = m[1].replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      if (t.length > 8 && t.length < 300 && /\bnot\b[^.]{0,25}\b(fit|work|compatible)/i.test(t) && !out.includes(t)) out.push(t);
+    }
+    return out.slice(0, 12);
+  }
+  const DRIVE_WORDS = /^(2wd|4wd|4x4|4x2|awd|rwd|2wd\/4wd)$/i;
+  const normTxt = s => ' ' + String(s || '').toLowerCase().replace(/["“”'’]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  function notePhrases(note) {
+    const m = note.match(/\bnot\s+(?:fit|work\s+(?:on|with)|compatible\s+with)\s+(?:the\s+|any\s+)?(?:models?\s+(?:with|equipped\s+with|that\s+have)\s+)?(.+?)(?:\s+models?\b|\s+trucks?\b|\s+vehicles?\b|\s+as\s+|\s+because\s+|\s+due\s+|\s+when\s+|[.(;:]|$)/i);
+    if (!m) return [];
+    return m[1].split(/\s*(?:,|\bor\b|\band\b|\/|&)\s*/i)
+      .map(x => x.replace(/["“”]/g, '').replace(/\b(19|20)\d{2}(\s*-\s*(19|20)?\d{2})?\b/g, '').replace(/\b(the|all|any|equipped|with|factory)\b/gi, '').replace(/\s+/g, ' ').trim())
+      .filter(x => x.length >= 2 && !DRIVE_WORDS.test(x) && /[a-z]/i.test(x));
+  }
+  // ¿El mensaje del cliente menciona una versión que la nota excluye?
+  function fitmentAlerts(notes, msg) {
+    const M = normTxt(msg);
+    if (M.trim() === '') return [];
+    const hits = [];
+    (notes || []).forEach(note => {
+      const exact = [], partial = [];
+      notePhrases(note).forEach(ph => {
+        const P = normTxt(ph).trim();
+        if (!P) return;
+        const words = P.split(' ');
+        if (M.includes(' ' + P + ' ')) exact.push(ph);
+        else if (words.length >= 2 && M.includes(' ' + words.slice(1).join(' ') + ' ')) partial.push(ph); // "LT Trail Boss" → "trail boss"
+      });
+      (exact.length ? exact : partial).forEach(ph => { if (!hits.some(x => x.phrase === ph && x.note === note)) hits.push({ phrase: ph, note }); });
+    });
+    return hits;
+  }
+
   // ---------- Armar la cotización ----------
   // items: [{title, price, url, starting}] ; q: {model, year, drive, inches, kind}
   function buildQuote(items, q) {
@@ -407,7 +446,7 @@
     return { blocks, others, fitsCount: fits.length };
   }
 
-  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, slugify, squash };
+  const api = { MAKES, MODELS, makeLabel, resolveModel, localParse, liftPrice, levelPrice, money, inchStr, lineFor, isSpanish, analyzeTitle, parseListing, parseText, buildQuote, fitmentNotes, fitmentAlerts, notePhrases, slugify, squash };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Core = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
