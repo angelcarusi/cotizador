@@ -31,7 +31,7 @@ function libro() { return SpreadsheetApp.getActive() || SpreadsheetApp.openById(
 
 const CAT = 'Catalog', BUS = 'Search', HIS = 'History', LIS = 'Lists';
 const HEAD = ['Make', 'Model', 'Drive', 'Year from', 'Year to', 'Type', 'Lift',
-  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Install time', 'Key'];
+  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Install time', 'Dually', 'Key'];
 const ROW0 = 4; // primera fila de datos en Catálogo
 const COLS = HEAD.length;
 
@@ -84,7 +84,7 @@ function armarCatalogo(sh) {
   banda(sh, 1, COLS, T.titulo, T.sub);
   sh.getRange(3, 1, 1, COLS).setValues([HEAD]);
   sh.setFrozenRows(3);
-  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 120, 10];
+  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 120, 150, 10];
   widths.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.hideColumns(COLS);
   formatoDatos(sh, ROW0, 300);
@@ -102,7 +102,7 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 10, n, 1).setHorizontalAlignment('center').setFontColor(T.muted);
   sh.getRange(r, 11, n, 1).setWrap(false);
   sh.getRange(r, 12, n, 1).setHorizontalAlignment('center');
-  sh.getRange(r, 14, n, 1).setHorizontalAlignment('center').setFontWeight('bold');
+  sh.getRange(r, 14, n, 2).setHorizontalAlignment('center').setFontWeight('bold');
   sh.getRange(r, 13, n, 1).setNumberFormat('mm/dd/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
 }
 
@@ -155,7 +155,9 @@ function estiloCatalogo(sh) {
   body.setBorder(null, null, true, null, null, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
   // Tipo: se distingue igual en cualquier color de fila
   const tipo = sh.getRange(ROW0, 6, Math.max(n, 1), 1);
+  const dcol = sh.getRange(ROW0, COLS - 1, Math.max(n, 1), 1);
   sh.setConditionalFormatRules([
+    SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('DUALLY').setBackground('#ffd43b').setFontColor('#1c2430').setBold(true).setRanges([dcol]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Lift').setBackground(T.ink).setFontColor('#ffffff').setBold(true).setRanges([tipo]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Leveling').setBackground('#ffffff').setFontColor(T.ink).setBold(true).setRanges([tipo]).build()
   ]);
@@ -181,31 +183,34 @@ function armarListas(sh) {
   sh.getRange('C1:C3').setValues([['All'], ['4x4'], ['4x2']]);
 }
 
-function armarBuscar(sh) {
-  try { sh.setHiddenGridlines(true); } catch (e) { }
-  const W = 7;
-  [24, 120, 170, 120, 130, 420, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
-  banda(sh, 1, W, T.titulo, 'Pick a vehicle to see its kits and prices');
-  sh.getRange(3, 1, 1, W).setBackground('#ffffff');
-  sh.setRowHeight(3, 12);
+function armarBuscar(sh, soloResultados) {
+  if (!soloResultados) {
+    try { sh.setHiddenGridlines(true); } catch (e) { }
+    const W = 8;
+    [24, 120, 170, 120, 130, 420, 90, 170].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+    banda(sh, 1, W, T.titulo, 'Pick a vehicle to see its kits and prices');
+    sh.getRange(3, 1, 1, W).setBackground('#ffffff');
+    sh.setRowHeight(3, 12);
 
-  const lab = [['Make'], ['Model'], ['Year'], ['Drive']];
-  sh.getRange('B5:B8').setValues(lab).setFontWeight('bold').setFontColor(T.ink2).setFontFamily(T.font).setHorizontalAlignment('right');
-  const inp = sh.getRange('C5:C8');
-  inp.setBackground(T.accentSoft).setFontWeight('bold').setFontSize(12).setFontFamily(T.font)
-    .setBorder(true, true, true, true, true, true, T.accent, SpreadsheetApp.BorderStyle.SOLID);
-  sh.getRange('C8').setValue('All');
-  const lis = libro().getSheetByName(LIS);
-  sh.getRange('C5').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('A1:A500'), true).setAllowInvalid(false).build());
-  sh.getRange('C6').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('B1:B500'), true).setAllowInvalid(true).build());
-  sh.getRange('C5:C6').setNumberFormat('@');
-  sh.getRange('C7').setNumberFormat('0').setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1950, 2100).setAllowInvalid(false).build());
-  sh.getRange('C8').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('C1:C3'), true).build());
-  sh.getRange('D5:F8').setFontColor(T.muted).setFontSize(9).setFontFamily(T.font);
-  sh.getRange('D5').setValue('Tap an orange cell and pick from the list');
-  sh.getRange('D7').setValue('Finds every kit whose year range includes this year');
-
-  sh.getRange(10, 2, 1, 6).setValues([['Type', 'Lift', 'Installed price', 'RC base price', 'Rough Country kit', 'Years']])
+    const lab = [['Make'], ['Model'], ['Year'], ['Drive']];
+    sh.getRange('B5:B8').setValues(lab).setFontWeight('bold').setFontColor(T.ink2).setFontFamily(T.font).setHorizontalAlignment('right');
+    const inp = sh.getRange('C5:C8');
+    inp.setBackground(T.accentSoft).setFontWeight('bold').setFontSize(12).setFontFamily(T.font)
+      .setBorder(true, true, true, true, true, true, T.accent, SpreadsheetApp.BorderStyle.SOLID);
+    sh.getRange('C8').setValue('All');
+    const lis = libro().getSheetByName(LIS);
+    sh.getRange('C5').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('A1:A500'), true).setAllowInvalid(false).build());
+    sh.getRange('C6').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('B1:B500'), true).setAllowInvalid(true).build());
+    sh.getRange('C5:C6').setNumberFormat('@');
+    sh.getRange('C7').setNumberFormat('0').setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1950, 2100).setAllowInvalid(false).build());
+    sh.getRange('C8').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInRange(lis.getRange('C1:C3'), true).build());
+    sh.getRange('D5:F8').setFontColor(T.muted).setFontSize(9).setFontFamily(T.font);
+    sh.getRange('D5').setValue('Tap an orange cell and pick from the list');
+    sh.getRange('D7').setValue('Finds every kit whose year range includes this year');
+  }
+  sh.setColumnWidth(8, 170);
+  sh.getRange(1, 8, 2, 1).setBackground(T.ink);
+  sh.getRange(10, 2, 1, 7).setValues([['Type', 'Lift', 'Installed price', 'RC base price', 'Rough Country kit', 'Years', 'Dually']])
     .setBackground(T.ink).setFontColor('#ffffff').setFontWeight('bold').setFontFamily(T.font).setHorizontalAlignment('center');
   sh.setRowHeight(10, 28);
   const c = `'${CAT}'!`, R = (col) => `${c}${col}${ROW0}:${col}`;
@@ -215,14 +220,17 @@ function armarBuscar(sh) {
     `(C8="All")+(${R('C')}=C8)+(${R('C')}="4x2 / 4x4")+(${R('C')}="All")>0`;
   sh.getRange('B11').setFormula(
     `=IF(OR(C5="",C6="",C7=""),"Pick make, model and year above",` +
-    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No saved kits for that vehicle and year yet"))`);
-  sh.getRange('B11:G200').setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
+    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')},${R('O')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No saved kits for that vehicle and year yet"))`);
+  sh.getRange('B11:H200').setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
   sh.getRange('B11:C200').setHorizontalAlignment('center');
   sh.getRange('C11:C200').setNumberFormat('0.##"″"');
   sh.getRange('D11:D200').setNumberFormat('$#,##0').setFontWeight('bold').setFontColor(T.accent).setHorizontalAlignment('right');
   sh.getRange('E11:E200').setNumberFormat('$#,##0.00').setFontColor(T.muted).setHorizontalAlignment('right');
   sh.getRange('G11:G200').setHorizontalAlignment('center').setFontColor(T.muted);
-  const res = sh.getRange('B11:G200');
+  sh.getRange('H11:H200').setHorizontalAlignment('center').setFontWeight('bold');
+  sh.setConditionalFormatRules([SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('DUALLY').setBackground('#ffd43b').setFontColor('#1c2430').setBold(true).setRanges([sh.getRange('H11:H200')]).build()]);
+  sh.getBandings().forEach(x => x.remove());
+  const res = sh.getRange('B11:H200');
   res.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false).setFirstRowColor(T.band1).setSecondRowColor(T.band2);
   sh.setFrozenRows(10);
 }
@@ -252,9 +260,9 @@ function guardarKits(kits) {
   if (!sh) throw new Error('Missing Catalog tab: run crearBaseDeDatos');
   asegurarColumnas(sh);
   const last = sh.getLastRow();
-  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS - 1, last - ROW0 + 1, 2).getValues() : [];
+  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS - 2, last - ROW0 + 1, 3).getValues() : [];
   const pos = {}, prevTime = {};
-  keys.forEach(([t, k], i) => { if (k) { pos[k] = ROW0 + i; prevTime[k] = t; } });
+  keys.forEach(([t, dw, k], i) => { if (k) { pos[k] = ROW0 + i; prevTime[k] = t; } });
   const now = new Date();
   const nuevos = [];
   let n = 0;
@@ -264,7 +272,8 @@ function guardarKits(kits) {
       k.tipo === 'leveling' ? 'Leveling' : 'Lift', +k.pulgadas || '',
       +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
       k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now,
-      k.instala || prevTime[k.clave] || '', k.clave];
+      k.instala || prevTime[k.clave] || '',
+      k.dually ? 'DUALLY  +$200 → $' + (+k.instalado + 200).toLocaleString('en-US') : '', k.clave];
     if (!k.clave) return;
     if (pos[k.clave]) sh.getRange(pos[k.clave], 1, 1, COLS).setValues([row]);
     else { nuevos.push(row); pos[k.clave] = -1; }
@@ -293,17 +302,21 @@ function guardarKits(kits) {
 
 // Hojas creadas antes de la columna "Install time": la agrega antes de la clave sin perder datos
 function asegurarColumnas(sh) {
-  const head = sh.getRange(3, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
-  if (head.indexOf('Install time') >= 0) return;
-  const keyCol = head.indexOf('Key') + 1;
-  if (keyCol < 1) return;
-  if (sh.getFilter()) sh.getFilter().remove();
-  sh.insertColumnBefore(keyCol);
-  sh.getRange(3, keyCol).setValue('Install time');
-  sh.setColumnWidth(keyCol, 120);
-  sh.showColumns(keyCol);
-  sh.hideColumns(keyCol + 1);
-  SpreadsheetApp.flush();
+  let changed = false;
+  ['Install time', 'Dually'].forEach(name => {
+    const head = sh.getRange(3, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    if (head.indexOf(name) >= 0) return;
+    const keyCol = head.indexOf('Key') + 1;
+    if (keyCol < 1) return;
+    if (sh.getFilter()) sh.getFilter().remove();
+    sh.insertColumnBefore(keyCol);
+    sh.getRange(3, keyCol).setValue(name);
+    sh.setColumnWidth(keyCol, name === 'Dually' ? 150 : 120);
+    sh.showColumns(keyCol);
+    sh.hideColumns(keyCol + 1);
+    changed = true;
+  });
+  if (changed) { SpreadsheetApp.flush(); armarBuscar(libro().getSheetByName(BUS), true); }
 }
 
 function guardarHistorial(c) {

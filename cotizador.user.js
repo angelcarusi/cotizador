@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cotizador Cheap on Tires
 // @namespace    https://angelcarusi.github.io/cotizador/
-// @version      1.6.0
+// @version      1.6.1
 // @description  Muestra la cotización lista para copiar sobre las páginas de lift kits de Rough Country.
 // @match        https://www.roughcountry.com/*
 // @match        https://roughcountry.com/*
@@ -23,7 +23,7 @@
   const C = (typeof Core !== 'undefined' && Core) || globalThis.Core;
   if (!C) return;
   const APP = 'https://angelcarusi.github.io/cotizador/';
-  const SCRIPT_V = 10; // sube con cada cambio; script-version.txt dice cuál es la última
+  const SCRIPT_V = 11; // sube con cada cambio; script-version.txt dice cuál es la última
 
   // ---------- qué vehículo es ----------
   // La app manda los datos en el hash: #cot=<json>. Si no viene, se saca de la dirección.
@@ -208,6 +208,7 @@
   // ---------- base de datos (Google Sheet) ----------
   function kitRows() {
     const out = [];
+    const canDuallyAll = C.hasDually(model, items);
     const seen = new Set();
     items.forEach(it => {
       const a = C.analyzeTitle(it.title);
@@ -226,7 +227,8 @@
         tipo: a.kind, pulgadas: a.inches,
         instalado: inst,
         base: it.price, starting: !!it.starting, titulo: it.title, url: it.url || '',
-        instala: (it.url && IT[it.url]) || ''
+        instala: (it.url && IT[it.url]) || '',
+        dually: canDuallyAll || /\bdually\b|\bdrw\b/i.test(it.title)
       });
     });
     return out;
