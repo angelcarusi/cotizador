@@ -74,6 +74,28 @@
     return { mk, md, label: cap(text), alias: [], match: key.length ? new RegExp(key.join('|'), 'i') : /./, generic: true };
   }
 
+  // Año de dos dígitos: "98" → 1998, "03" → 2003, "'21" → 2021.
+  // 50-99 son 19xx; 00 hasta el año próximo son 20xx. Se ignoran números que son
+  // pulgadas, llantas (33x12.50, 35s), tracción (4x4), precios o partes de otra cifra.
+  function shortYear(low) {
+    const nextYY = (new Date().getFullYear() + 1) % 100;
+    const toY = n => (n >= 50 ? 1900 + n : (n <= nextYY ? 2000 + n : null));
+    // 1) con pista clara: '21, del 21, modelo 21, year 21, año 21
+    const hint = low.match(/(?:['’`´]|\bdel\s+|\bmodelo\s+|\bmodel\s+|\byear\s+|\baño\s+|\bano\s+)(\d{2})\b/);
+    if (hint) { const y = toY(+hint[1]); if (y) return y; }
+    // 2) cualquier número suelto de 2 dígitos que no sea medida ni tracción
+    const re = /(^|[^0-9.,$x\/-])(\d{2})(?![0-9.,%])(?!\s*(?:"|”|''|in\b|inch|pulg|x\s*\d|s\b|mm\b|k\b|mil|miles|hp\b|\$|lb|wheel|rin|rines|llanta|tire))/gi;
+    let m;
+    while ((m = re.exec(low))) {
+      const n = +m[2];
+      const before = low.slice(Math.max(0, m.index - 2), m.index + m[1].length);
+      if (/\d\s*x\s*$/.test(before)) continue;           // 4x4, 33x12
+      const y = toY(n);
+      if (y) return y;
+    }
+    return null;
+  }
+
   // ---------- Leer el mensaje del cliente (sin IA) ----------
   function localParse(msg) {
     const raw = String(msg || '');
@@ -94,12 +116,9 @@
       if (ok) { out.model = m; break; }
     }
 
-    const y4 = low.match(/\b(19[89]\d|20[0-4]\d)\b/);
+    const y4 = low.match(/\b(19[5-9]\d|20[0-4]\d)\b/);
     if (y4) out.year = +y4[1];
-    else {
-      const y2 = low.match(/(?:'|’|\bdel\s|\bmodelo\s|\byear\s)(\d{2})\b/);
-      if (y2) out.year = +y2[1] < 50 ? 2000 + +y2[1] : 1900 + +y2[1];
-    }
+    else out.year = shortYear(low);
 
     // tracción: 4WD / AWD / 4x4 → 4x4 ; 2WD / RWD / 4x2 → 4x2 (acepta 4×4, 4-wd, "4 wheel drive", "4 por 4"…)
     const dl = low.replace(/[×✕✖*]/g, 'x');
