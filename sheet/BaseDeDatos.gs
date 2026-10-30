@@ -31,7 +31,7 @@ function libro() { return SpreadsheetApp.getActive() || SpreadsheetApp.openById(
 
 const CAT = 'Catalog', BUS = 'Search', HIS = 'History', LIS = 'Lists';
 const HEAD = ['Make', 'Model', 'Drive', 'Year from', 'Year to', 'Type', 'Lift',
-  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Install time', 'Dually', 'Key'];
+  'Installed price', 'RC base price', '"Starting at"', 'Rough Country kit', 'Link', 'Updated', 'Install time', 'Dually', 'Fitment notes', 'Key'];
 const ROW0 = 4; // primera fila de datos en Catálogo
 const COLS = HEAD.length;
 
@@ -84,7 +84,7 @@ function armarCatalogo(sh) {
   banda(sh, 1, COLS, T.titulo, T.sub);
   sh.getRange(3, 1, 1, COLS).setValues([HEAD]);
   sh.setFrozenRows(3);
-  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 120, 150, 10];
+  const widths = [110, 150, 100, 82, 82, 86, 78, 120, 115, 86, 380, 70, 130, 120, 150, 420, 10];
   widths.forEach((w, i) => sh.setColumnWidth(i + 1, w));
   sh.hideColumns(COLS);
   formatoDatos(sh, ROW0, 300);
@@ -103,6 +103,7 @@ function formatoDatos(sh, r, n) {
   sh.getRange(r, 11, n, 1).setWrap(false);
   sh.getRange(r, 12, n, 1).setHorizontalAlignment('center');
   sh.getRange(r, 14, n, 2).setHorizontalAlignment('center').setFontWeight('bold');
+  sh.getRange(r, 16, n, 1).setWrap(false).setFontSize(9);
   sh.getRange(r, 13, n, 1).setNumberFormat('mm/dd/yyyy').setFontColor(T.muted).setHorizontalAlignment('center');
 }
 
@@ -155,7 +156,7 @@ function estiloCatalogo(sh) {
   body.setBorder(null, null, true, null, null, true, '#ffffff', SpreadsheetApp.BorderStyle.SOLID);
   // Tipo: se distingue igual en cualquier color de fila
   const tipo = sh.getRange(ROW0, 6, Math.max(n, 1), 1);
-  const dcol = sh.getRange(ROW0, COLS - 1, Math.max(n, 1), 1);
+  const dcol = sh.getRange(ROW0, COLS - 2, Math.max(n, 1), 1);
   sh.setConditionalFormatRules([
     SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('DUALLY').setBackground('#ffd43b').setFontColor('#1c2430').setBold(true).setRanges([dcol]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('Lift').setBackground(T.ink).setFontColor('#ffffff').setBold(true).setRanges([tipo]).build(),
@@ -208,9 +209,10 @@ function armarBuscar(sh, soloResultados) {
     sh.getRange('D5').setValue('Tap an orange cell and pick from the list');
     sh.getRange('D7').setValue('Finds every kit whose year range includes this year');
   }
-  sh.setColumnWidth(8, 170);
-  sh.getRange(1, 8, 2, 1).setBackground(T.ink);
-  sh.getRange(10, 2, 1, 7).setValues([['Type', 'Lift', 'Installed price', 'RC base price', 'Rough Country kit', 'Years', 'Dually']])
+  sh.setColumnWidth(8, 170); sh.setColumnWidth(9, 420);
+  sh.getRange('I11:I200').setFontSize(9).setFontColor('#c92a2a');
+  sh.getRange(1, 8, 2, 2).setBackground(T.ink);
+  sh.getRange(10, 2, 1, 8).setValues([['Type', 'Lift', 'Installed price', 'RC base price', 'Rough Country kit', 'Years', 'Dually', 'Fitment notes']])
     .setBackground(T.ink).setFontColor('#ffffff').setFontWeight('bold').setFontFamily(T.font).setHorizontalAlignment('center');
   sh.setRowHeight(10, 28);
   const c = `'${CAT}'!`, R = (col) => `${c}${col}${ROW0}:${col}`;
@@ -220,7 +222,7 @@ function armarBuscar(sh, soloResultados) {
     `(C8="All")+(${R('C')}=C8)+(${R('C')}="4x2 / 4x4")+(${R('C')}="All")>0`;
   sh.getRange('B11').setFormula(
     `=IF(OR(C5="",C6="",C7=""),"Pick make, model and year above",` +
-    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')},${R('O')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No saved kits for that vehicle and year yet"))`);
+    `IFERROR(SORT(FILTER({${R('F')},${R('G')},${R('H')},${R('I')},${R('K')},${R('D')}&"–"&${R('E')},${R('O')},${R('P')}},${cond}),1,TRUE,2,TRUE,4,TRUE),"No saved kits for that vehicle and year yet"))`);
   sh.getRange('B11:H200').setFontFamily(T.font).setFontSize(10).setVerticalAlignment('middle');
   sh.getRange('B11:C200').setHorizontalAlignment('center');
   sh.getRange('C11:C200').setNumberFormat('0.##"″"');
@@ -230,13 +232,16 @@ function armarBuscar(sh, soloResultados) {
   sh.getRange('H11:H200').setHorizontalAlignment('center').setFontWeight('bold');
   sh.setConditionalFormatRules([SpreadsheetApp.newConditionalFormatRule().whenTextStartsWith('DUALLY').setBackground('#ffd43b').setFontColor('#1c2430').setBold(true).setRanges([sh.getRange('H11:H200')]).build()]);
   sh.getBandings().forEach(x => x.remove());
-  const res = sh.getRange('B11:H200');
+  const res = sh.getRange('B11:I200');
   res.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false).setFirstRowColor(T.band1).setSecondRowColor(T.band2);
   sh.setFrozenRows(10);
 }
 
 // ---------------------------------------------------------------- recibir datos
-function doGet(e) { return json({ ok: true, msg: 'Database online' }); }
+function doGet(e) {
+  if (e && e.parameter && e.parameter.urls) return json({ ok: true, urls: listaUrls() });
+  return json({ ok: true, msg: 'Database online' });
+}
 
 function doPost(e) {
   try {
@@ -247,6 +252,7 @@ function doPost(e) {
       let n = 0;
       if (d.kits && d.kits.length) n = guardarKits(d.kits);
       if (d.copy) guardarHistorial(d.copy);
+      if (d.detalles) n = guardarDetalles(d.detalles, d.fin);
       return json({ ok: true, saved: n });
     } finally { lock.releaseLock(); }
   } catch (err) {
@@ -260,9 +266,9 @@ function guardarKits(kits) {
   if (!sh) throw new Error('Missing Catalog tab: run crearBaseDeDatos');
   asegurarColumnas(sh);
   const last = sh.getLastRow();
-  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS - 2, last - ROW0 + 1, 3).getValues() : [];
-  const pos = {}, prevTime = {};
-  keys.forEach(([t, dw, k], i) => { if (k) { pos[k] = ROW0 + i; prevTime[k] = t; } });
+  const keys = last >= ROW0 ? sh.getRange(ROW0, COLS - 3, last - ROW0 + 1, 4).getValues() : [];
+  const pos = {}, prevTime = {}, prevDw = {}, prevNotes = {};
+  keys.forEach(([t, dw, nt, k], i) => { if (k) { pos[k] = ROW0 + i; prevTime[k] = t; prevDw[k] = String(dw); prevNotes[k] = nt; } });
   const now = new Date();
   const nuevos = [];
   let n = 0;
@@ -273,7 +279,8 @@ function guardarKits(kits) {
       +k.instalado, +k.base || '', k.starting ? 'Yes' : '',
       k.titulo || '', k.url ? '=HYPERLINK("' + String(k.url).replace(/"/g, '') + '","View")' : '', now,
       k.instala || prevTime[k.clave] || '',
-      k.dually ? 'DUALLY  +$200 → $' + (+k.instalado + 200).toLocaleString('en-US') : '', k.clave];
+      /^NO dually/.test(prevDw[k.clave] || '') ? prevDw[k.clave] : (k.dually || /^DUALLY/.test(prevDw[k.clave] || '') ? 'DUALLY  +$200 → $' + (+k.instalado + 200).toLocaleString('en-US') : ''),
+      k.notas || prevNotes[k.clave] || '', k.clave];
     if (!k.clave) return;
     if (pos[k.clave]) sh.getRange(pos[k.clave], 1, 1, COLS).setValues([row]);
     else { nuevos.push(row); pos[k.clave] = -1; }
@@ -303,7 +310,7 @@ function guardarKits(kits) {
 // Hojas creadas antes de la columna "Install time": la agrega antes de la clave sin perder datos
 function asegurarColumnas(sh) {
   let changed = false;
-  ['Install time', 'Dually'].forEach(name => {
+  ['Install time', 'Dually', 'Fitment notes'].forEach(name => {
     const head = sh.getRange(3, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
     if (head.indexOf(name) >= 0) return;
     const keyCol = head.indexOf('Key') + 1;
@@ -311,12 +318,47 @@ function asegurarColumnas(sh) {
     if (sh.getFilter()) sh.getFilter().remove();
     sh.insertColumnBefore(keyCol);
     sh.getRange(3, keyCol).setValue(name);
-    sh.setColumnWidth(keyCol, name === 'Dually' ? 150 : 120);
+    sh.setColumnWidth(keyCol, name === 'Dually' ? 150 : name === 'Fitment notes' ? 420 : 120);
     sh.showColumns(keyCol);
     sh.hideColumns(keyCol + 1);
     changed = true;
   });
   if (changed) { SpreadsheetApp.flush(); armarBuscar(libro().getSheetByName(BUS), true); }
+}
+
+// Tiempo de instalación, Fitment notes y dually leídos de la página de cada kit (por URL)
+function guardarDetalles(det, fin) {
+  const sh = libro().getSheetByName(CAT);
+  asegurarColumnas(sh);
+  const last = sh.getLastRow(); if (last < ROW0) return 0;
+  const n = last - ROW0 + 1;
+  const links = sh.getRange(ROW0, 12, n, 1).getFormulas().map(r => (String(r[0]).match(/HYPERLINK\("([^"]+)"/) || [])[1] || '');
+  const inst = sh.getRange(ROW0, 8, n, 1).getValues();
+  const cur = sh.getRange(ROW0, 14, n, 3).getValues();
+  const byUrl = {}; det.forEach(x => { if (x && x.url) byUrl[x.url.split('?')[0]] = x; });
+  let c = 0;
+  links.forEach((u, i) => {
+    const x = byUrl[u.split('?')[0]]; if (!x) return;
+    if (x.instala) cur[i][0] = x.instala;
+    if (x.dually === 'no') cur[i][1] = 'NO dually';
+    else if (x.dually === 'yes' || /^DUALLY/.test(String(cur[i][1]))) cur[i][1] = 'DUALLY  +$200 → $' + (+inst[i][0] + 200).toLocaleString('en-US');
+    if (x.notas != null) cur[i][2] = x.notas;
+    c++;
+  });
+  sh.getRange(ROW0, 14, n, 3).setValues(cur);
+  if (fin) estiloCatalogo(sh);
+  return c;
+}
+
+// URLs de todos los kits del Catalog (para leer sus detalles)
+function listaUrls() {
+  const sh = libro().getSheetByName(CAT);
+  const last = sh.getLastRow(); if (last < ROW0) return [];
+  const f = sh.getRange(ROW0, 12, last - ROW0 + 1, 1).getFormulas();
+  const t = sh.getRange(ROW0, 14, last - ROW0 + 1, 3).getValues();
+  const out = {};
+  f.forEach((r, i) => { const u = (String(r[0]).match(/HYPERLINK\("([^"]+)"/) || [])[1]; if (u) out[u] = out[u] || !!(t[i][0] || t[i][2]); });
+  return Object.keys(out).map(u => ({ u, done: out[u] }));
 }
 
 function guardarHistorial(c) {
