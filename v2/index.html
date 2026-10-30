@@ -385,6 +385,8 @@ function render(){
 
   if (canDually) h += `<div class="dually"><b>⚠ ${esc(T('duallyT'))}</b><label><input type="checkbox" id="dcb" ${q.dually?'checked':''}> ${esc(T('duallyL'))}</label></div>`;
 
+  // si 4x4 y 4x2 dan exactamente lo mismo, se muestra un solo bloque
+  if (res.blocks.length === 2 && res.blocks[0].text === res.blocks[1].text) res.blocks = [res.blocks[0]];
   res.blocks.forEach((b, bi) => {
     if (res.blocks.length > 1) h += `<div class="dtitle">${b.drive==='4WD'?'4x4':'4x2'}</div>`;
     if (!b.kits.length){
