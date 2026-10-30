@@ -239,8 +239,41 @@ function armarBuscar(sh, soloResultados) {
 
 // ---------------------------------------------------------------- recibir datos
 function doGet(e) {
-  if (e && e.parameter && e.parameter.urls) return json({ ok: true, urls: listaUrls() });
+  const p = (e && e.parameter) || {};
+  if (p.urls) return json({ ok: true, urls: listaUrls() });
+  if (p.v) return json({ ok: true, v: version() });
+  if (p.catalog) return json({ ok: true, v: version(), rows: catalogo() });
   return json({ ok: true, msg: 'Database online' });
+}
+
+// ---------------------------------------------------------------- lectura para la app v2
+function version() { return PropertiesService.getScriptProperties().getProperty('CAT_VERSION') || '0'; }
+function tocarVersion() { PropertiesService.getScriptProperties().setProperty('CAT_VERSION', String(Date.now())); }
+function catalogo() {
+  const sh = libro().getSheetByName(CAT);
+  const last = sh.getLastRow(); if (last < ROW0) return [];
+  const n = last - ROW0 + 1;
+  const v = sh.getRange(ROW0, 1, n, COLS - 1).getValues();
+  const f = sh.getRange(ROW0, 12, n, 1).getFormulas();
+  const out = [];
+  v.forEach((r, i) => {
+    if (!r[0] || typeof r[7] !== 'number') return;
+    const url = (String(f[i][0]).match(/HYPERLINK\("([^"]+)"/) || [])[1] || '';
+    // [marca, modelo, tracción, desde, hasta, tipo, pulgadas, instalado, base, desde?, título, url, tiempo, dually, notas]
+    out.push([r[0], String(r[1]), r[2], r[3] || 0, r[4] || 0, r[5] === 'Leveling' ? 'l' : 'L', +r[6] || 0, r[7], +r[8] || 0, r[9] === 'Yes' ? 1 : 0, r[10], url, r[13] || '', /^NO/.test(r[14]) ? 'no' : (/^DUALLY/.test(r[14]) ? 'yes' : ''), r[15] || '']);
+  });
+  return out;
+}
+function escrituraPermitida(e) {
+  const t = PropertiesService.getScriptProperties().getProperty('WRITE_TOKEN');
+  return !t || ((e && e.parameter && e.parameter.k) === t);
+}
+// Ejecutar una vez: crea la contraseña de escritura y la muestra en el registro
+function crearToken() {
+  const t = Utilities.getUuid().replace(/-/g, '').slice(0, 20);
+  PropertiesService.getScriptProperties().setProperty('WRITE_TOKEN', t);
+  Logger.log('WRITE_TOKEN=' + t);
+  return t;
 }
 
 function doPost(e) {
@@ -250,9 +283,11 @@ function doPost(e) {
     lock.waitLock(20000);
     try {
       let n = 0;
-      if (d.kits && d.kits.length) n = guardarKits(d.kits);
+      const puede = escrituraPermitida(e);
+      if ((d.kits || d.detalles) && !puede) return json({ ok: false, error: 'write key missing or wrong' });
+      if (d.kits && d.kits.length) { n = guardarKits(d.kits); tocarVersion(); }
       if (d.copy) guardarHistorial(d.copy);
-      if (d.detalles) n = guardarDetalles(d.detalles, d.fin);
+      if (d.detalles) { n = guardarDetalles(d.detalles, d.fin); tocarVersion(); }
       return json({ ok: true, saved: n });
     } finally { lock.releaseLock(); }
   } catch (err) {

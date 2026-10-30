@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101215">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="COT Quotes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon-192.png">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="preload" href="fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/barlow-condensed-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<title>Cheap on Tires Quotes</title>
+<style>
+@font-face{font-family:Barlow;font-weight:400;font-display:swap;src:url(fonts/barlow-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:Barlow;font-weight:500;font-display:swap;src:url(fonts/barlow-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:Barlow;font-weight:600;font-display:swap;src:url(fonts/barlow-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-weight:600;font-display:swap;src:url(fonts/barlow-condensed-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Barlow Condensed';font-weight:700;font-display:swap;src:url(fonts/barlow-condensed-latin-700-normal.woff2) format('woff2')}
+:root{
+  --bg:#141619; --top:#101215; --panel:#1d2025; --panel2:#24282e; --field:#121418; --line:#30353d; --line2:#454b55;
+  --fg:#eef0f2; --mute:#9aa2ad; --acc:#ff7a1a; --accfg:#1a0f05; --warn:#ffb020; --red:#ff5c5c; --ok:#3ddc84;
+  --cond:'Barlow Condensed','Arial Narrow',Arial,sans-serif; --body:Barlow,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0}
+html,body{background:var(--bg)}
+body{color:var(--fg);font:15px/1.45 var(--body);-webkit-text-size-adjust:100%;min-height:100vh;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+[hidden]{display:none!important}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:12px 22px;padding-top:calc(12px + env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--top)}
+.logo{font:700 22px var(--cond);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+.logo b{color:var(--acc)}
+.tag{font:600 12px var(--cond);letter-spacing:1.5px;text-transform:uppercase;color:var(--mute);border-left:1px solid var(--line);padding-left:12px}
+.sp{flex:1}
+.sync{font-size:12px;color:var(--mute);background:none;border:0;padding:4px 6px;border-radius:6px;white-space:nowrap}
+.sync i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+.sync.busy i{background:var(--warn)} .sync.err i{background:var(--red)}
+.lang{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.lang button{border:0;background:none;padding:6px 11px;font:600 13px var(--cond);letter-spacing:1px;color:var(--mute)}
+.lang .on{background:var(--fg);color:var(--bg)}
+
+/* layout */
+.wrap{display:grid;grid-template-columns:430px minmax(0,1fr);gap:22px;padding:22px;max-width:1280px;margin:0 auto}
+.h{font:700 13px var(--cond);letter-spacing:2px;text-transform:uppercase;color:var(--mute);margin:0 0 10px;display:flex;gap:8px;align-items:center}
+.h em{font-style:normal;background:var(--acc);color:var(--accfg);width:20px;height:20px;border-radius:4px;display:grid;place-items:center;font-size:13px;letter-spacing:0}
+.h .hint{margin-left:auto;font:500 12px var(--body);letter-spacing:0;text-transform:none;color:var(--mute)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.mt{margin-top:18px}
+textarea{display:block;width:100%;height:118px;background:var(--field);border:1px solid var(--line);border-radius:8px;font:15px/1.45 var(--body);padding:12px;resize:vertical}
+textarea::placeholder,input::placeholder{color:#6c737d}
+.row{display:flex;gap:10px;margin-top:12px}
+.btn{flex:1;min-height:48px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);font:700 17px var(--cond);letter-spacing:1px;text-transform:uppercase}
+.btn:hover{border-color:var(--line2)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:var(--accfg)}
+.btn.p:hover{filter:brightness(1.06)}
+.btn.sm{flex:0 0 auto;padding:0 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.full{grid-column:1/-1}
+.f label{display:block;font:600 11px var(--cond);letter-spacing:1.5px;text-transform:uppercase;color:var(--mute);margin-bottom:5px}
+.f select,.f input{width:100%;height:42px;background:var(--field);border:1px solid var(--line);border-radius:7px;padding:0 11px;font-weight:600}
+.f select{appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--mute) 50%),linear-gradient(135deg,var(--mute) 50%,transparent 50%);background-position:calc(100% - 17px) 18px,calc(100% - 12px) 18px;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+.f .miss{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+.seg{display:flex;background:var(--field);border:1px solid var(--line);border-radius:7px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:none;padding:7px 0;border-radius:5px;font:600 14px var(--cond);letter-spacing:.5px;color:var(--mute)}
+.seg .on{background:var(--panel2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line2)}
+
+/* results */
+.empty{display:grid;place-items:center;text-align:center;min-height:300px;color:var(--mute);padding:20px}
+.empty b{display:block;font:700 22px var(--cond);text-transform:uppercase;letter-spacing:.5px;color:var(--fg);margin-bottom:6px}
+.empty ol{text-align:left;margin:14px auto 0;padding-left:20px;max-width:330px;line-height:1.9}
+.res-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.veh{font:700 30px/1.1 var(--cond);text-transform:uppercase;letter-spacing:.5px}
+.veh small{color:var(--acc);font-size:inherit}
+.pill{font:600 12px var(--cond);letter-spacing:1px;padding:3px 8px;border-radius:4px;background:var(--panel2);color:var(--mute);text-transform:uppercase}
+.rc{margin-left:auto;font-size:13px;color:var(--mute);text-decoration:none;border-bottom:1px dotted var(--line2)}
+.rc:hover{color:var(--fg)}
+.note{border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:14px}
+.note b{display:block;margin-bottom:2px;text-transform:uppercase;font:700 15px var(--cond);letter-spacing:.5px}
+.n-o{background:#2a1f0c;border:1px solid #6b4a10;color:#ffd38a}.n-o b{color:var(--warn)}
+.n-r{background:#2b1214;border:1px solid #7a2a2f;color:#ffb3b3}.n-r b{color:var(--red)}
+.n-r .src{display:block;margin-top:4px;font-size:12.5px;color:#e29a9a}
+.dually{background:#2a1f0c;border:1px solid #8a5a10;border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dually b{font:700 15px var(--cond);letter-spacing:.5px;color:var(--warn);text-transform:uppercase}
+.dually label{display:flex;align-items:center;gap:8px;margin-left:auto;font-weight:600;color:#ffe3ad;cursor:pointer}
+.dually input{width:20px;height:20px;accent-color:var(--acc)}
+.dtitle{font:700 13px var(--cond);letter-spacing:2px;color:var(--mute);margin:16px 0 8px;text-transform:uppercase}
+.dtitle:first-of-type{margin-top:0}
+.quote{background:#0f1113;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;padding:16px 18px;font:500 19px/1.5 var(--body);white-space:pre-wrap;word-break:break-word;user-select:all;-webkit-user-select:all}
+.copy{width:100%;min-height:56px;margin-top:12px;font-size:20px}
+.copy.done{background:var(--ok);border-color:var(--ok)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.sub{background:var(--panel2)}
+.kit{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.kit:first-of-type{border-top:0;padding-top:0}
+.kit .t{color:var(--mute);font-size:12.5px}
+.kit a{color:inherit;text-decoration:none}
+.kit a:hover{color:var(--acc)}
+.kit .p{font:700 20px var(--cond);white-space:nowrap;text-align:right}
+.kit .p s{color:var(--mute);font-weight:500;font-size:14px;text-decoration:none;margin-right:6px}
+.kit .p small{display:block;font:600 11px var(--body);color:var(--warn)}
+.time{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.time:first-of-type{border-top:0;padding-top:0}
+.time b{color:var(--acc);white-space:nowrap}
+.foot{font-size:12px;color:var(--mute);margin-top:14px;text-align:center}
+.none{padding:12px;border:1px dashed var(--line2);border-radius:8px;color:var(--mute)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:9}
+
+@media(max-width:860px){
+  .wrap{grid-template-columns:1fr;padding:14px;gap:16px}
+  .top{padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));gap:10px}
+  .tag{display:none}
+  .logo{font-size:20px}
+  .veh{font-size:24px}
+  .cols{grid-template-columns:1fr}
+  .quote{font-size:17px}
+}
+@media(max-width:380px){ .sync span{display:none} }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="logo">Cheap on <b>Tires</b></div>
+  <div class="tag" data-t="tagline">Lift &amp; Level Quotes</div>
+  <div class="sp"></div>
+  <button class="sync busy" id="sync" title=""><i></i><span id="syncTxt">Loading…</span></button>
+  <div class="lang" id="ui"><button data-v="en" class="on">EN</button><button data-v="es">ES</button></div>
+</div>
+
+<div class="wrap">
+  <section>
+    <div class="h"><em>1</em><span data-t="s1">Customer message</span></div>
+    <div class="card">
+      <textarea id="msg" data-ph="ph_msg" placeholder="Paste the customer's message here"></textarea>
+      <div class="row">
+        <button class="btn" id="paste" data-t="paste">Paste</button>
+        <button class="btn p" id="go" data-t="quote">Quote</button>
+      </div>
+    </div>
+
+    <div class="h mt"><em>2</em><span data-t="s2">Vehicle</span><span class="hint" data-t="hint2">Check or change it</span></div>
+    <div class="card grid">
+      <div class="f"><label for="mk" data-t="make">Make</label><select id="mk"></select></div>
+      <div class="f"><label for="md" data-t="model">Model</label><select id="md"></select></div>
+      <div class="f"><label for="yr" data-t="year">Year</label><input id="yr" inputmode="numeric" maxlength="4" placeholder="2021"></div>
+      <div class="f"><label for="in" data-t="lift">Lift</label><input id="in" inputmode="decimal" data-ph="ph_all" placeholder="All sizes"></div>
+      <div class="f full"><label for="trim" data-t="trim">Trim / version</label><input id="trim" data-ph="ph_trim" placeholder="Optional: ZR2, Trail Boss, diesel, dually…"></div>
+      <div class="f full"><label data-t="drive">Drive</label><div class="seg" id="drv"><button data-v="4WD" class="on">4x4</button><button data-v="2WD">4x2</button><button data-v="" data-t="both">Both</button></div></div>
+      <div class="f full"><label data-t="type">Type</label><div class="seg" id="knd"><button data-v="" class="on" data-t="all">All</button><button data-v="leveling">Leveling</button><button data-v="lift">Lift</button></div></div>
+      <div class="f full"><label data-t="reply">Reply language</label><div class="seg" id="lng"><button data-v="auto" class="on">Auto</button><button data-v="en" data-t="english">English</button><button data-v="es" data-t="spanish">Spanish</button></div></div>
+    </div>
+  </section>
+
+  <section id="resSec">
+    <div class="h"><em>3</em><span data-t="s3">Quote</span></div>
+    <div class="card" id="res"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="../core.js?v=15"></script>
+<script>
+(function(){
+'use strict';
+const C = window.Core;
+const SHEET = 'https://script.google.com/macros/s/AKfycbwG49mUlDOOZ5DLgTqOWvsUdypptqVhJ_PkU74T1DwqvIfbjpJ8_nzYdq8DxlymnWE_/exec';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+
+// ---------- textos EN / ES ----------
+const TX = {
+  en:{tagline:'Lift & Level Quotes',s1:'Customer message',s2:'Vehicle',s3:'Quote',hint2:'Check or change it',paste:'Paste',quote:'Quote',make:'Make',model:'Model',year:'Year',lift:'Lift',trim:'Trim / version',drive:'Drive',both:'Both',type:'Type',all:'All',reply:'Reply language',english:'English',spanish:'Spanish',
+    ph_msg:"Paste the customer's message here",ph_all:'All sizes',ph_trim:'Optional: ZR2, Trail Boss, diesel, dually…',
+    emptyT:'Ready to quote',empty1:'Paste the customer message',empty2:'Tap Quote',empty3:'Check the vehicle and copy the reply',
+    loading:'Loading catalog…',kits:'kits',synced:'synced',offline:'offline · saved copy',syncErr:'Could not load the catalog',
+    pick:'Pick',missMake:'Pick the make',missModel:'Pick the model',missYear:'Enter the year',missTitle:'Missing info',
+    copy:'Copy quote',copied:'Copied',copyFail:'Press and hold the text to copy',kitsT:'Kits',timeT:'Install time',noTime:'—',
+    base:'base',nearT:'No {a}" kit for this truck',nearB:'Showing the closest sizes: {s}.',lower:'lower',higher:'higher',
+    noKitsT:'No kits for this selection',avail:'Available sizes',noneAtAll:'No kits saved for this vehicle and year. Check the year or open Rough Country.',
+    fitT:'{p} does not fit',fitB:'Does not fit: {k}.',duallyT:'This model has a dually version',duallyL:'It is dually (+$200)',noDually:'Not for dually',noDuallyB:'Does not fit dually models: {k}.',
+    rc:'View on Rough Country',foot:'Prices from the Rough Country catalog · saved to History when you copy',
+    t4:'4x4',t2:'4x2',paste_hint:'Press and hold in the box and choose Paste',dually:'dually +$200'},
+  es:{tagline:'Cotizaciones lift y leveling',s1:'Mensaje del cliente',s2:'Vehículo',s3:'Cotización',hint2:'Revisa o cámbialo',paste:'Pegar',quote:'Cotizar',make:'Marca',model:'Modelo',year:'Año',lift:'Pulgadas',trim:'Versión',drive:'Tracción',both:'Ambas',type:'Tipo',all:'Todos',reply:'Idioma de la respuesta',english:'Inglés',spanish:'Español',
+    ph_msg:'Pega aquí el mensaje del cliente',ph_all:'Todas',ph_trim:'Opcional: ZR2, Trail Boss, diesel, dually…',
+    emptyT:'Listo para cotizar',empty1:'Pega el mensaje del cliente',empty2:'Toca Cotizar',empty3:'Revisa el vehículo y copia la respuesta',
+    loading:'Cargando catálogo…',kits:'kits',synced:'actualizado',offline:'sin conexión · copia guardada',syncErr:'No se pudo cargar el catálogo',
+    pick:'Elegir',missMake:'Elige la marca',missModel:'Elige el modelo',missYear:'Escribe el año',missTitle:'Falta información',
+    copy:'Copiar cotización',copied:'Copiado',copyFail:'Mantén presionado el texto para copiar',kitsT:'Kits',timeT:'Tiempo de instalación',noTime:'—',
+    base:'base',nearT:'No hay kit de {a}" para esta camioneta',nearB:'Te muestro las medidas más cercanas: {s}.',lower:'menor',higher:'mayor',
+    noKitsT:'No hay kits para esta selección',avail:'Medidas disponibles',noneAtAll:'No hay kits guardados para este vehículo y año. Revisa el año o abre Rough Country.',
+    fitT:'{p} no es compatible',fitB:'No le sirve: {k}.',duallyT:'Este modelo tiene versión dually',duallyL:'Es dually (+$200)',noDually:'No sirve para dually',noDuallyB:'No le sirve a dually: {k}.',
+    rc:'Ver en Rough Country',foot:'Precios del catálogo de Rough Country · se guarda en History al copiar',
+    t4:'4x4',t2:'4x2',paste_hint:'Mantén presionado en el cuadro y elige Pegar',dually:'dually +$200'}
+};
+let UI = LS.get('ui', 'en');
+const T = (k, o) => { let s = (TX[UI] && TX[UI][k]) || TX.en[k] || k; if (o) Object.keys(o).forEach(x => s = s.split('{'+x+'}').join(o[x])); return s; };
+function applyUI(){
+  document.documentElement.lang = UI;
+  document.querySelectorAll('[data-t]').forEach(e => e.textContent = T(e.dataset.t));
+  document.querySelectorAll('[data-ph]').forEach(e => e.placeholder = T(e.dataset.ph));
+  document.querySelectorAll('#ui button').forEach(b => b.classList.toggle('on', b.dataset.v === UI));
+  fillMakes(); syncLabel(); render();
+}
+$('#ui').onclick = e => { const b = e.target.closest('button'); if(!b) return; UI = b.dataset.v; LS.set('ui', UI); applyUI(); };
+
+function toast(t){ const e=$('#toast'); e.textContent=t; e.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>e.hidden=true,1600); }
+
+// ---------- catálogo (Sheet) ----------
+// fila: [marca, modelo, tracción, desde, hasta, tipo l/L, pulgadas, instalado, base, desde?, título, url, tiempo, dually, notas]
+let CAT = LS.get('cat', null);   // {v, ts, rows}
+let syncState = CAT ? 'ok' : 'busy';
+function syncLabel(){
+  const b=$('#sync'); b.className='sync'+(syncState==='busy'?' busy':syncState==='err'?' err':'');
+  let t;
+  if (syncState==='busy' && !CAT) t = T('loading');
+  else if (syncState==='err' && !CAT) t = T('syncErr');
+  else if (syncState==='err') t = (CAT.rows.length)+' '+T('kits')+' · '+T('offline');
+  else t = CAT.rows.length+' '+T('kits')+' · '+T('synced')+' '+new Date(CAT.ts).toLocaleTimeString(UI==='es'?'es':'en-US',{hour:'numeric',minute:'2-digit'});
+  $('#syncTxt').textContent = t;
+}
+async function sync(force){
+  syncState='busy'; syncLabel();
+  try{
+    if (CAT && !force){
+      const v = await fetch(SHEET+'?v=1').then(r=>r.json());
+      if (v && v.ok && String(v.v)===String(CAT.v)){ CAT.ts=Date.now(); LS.set('cat',CAT); syncState='ok'; syncLabel(); return; }
+    }
+    const j = await fetch(SHEET+'?catalog=1').then(r=>r.json());
+    if (!j || !j.ok || !Array.isArray(j.rows)) throw new Error('bad');
+    CAT = { v:j.v, ts:Date.now(), rows:j.rows }; LS.set('cat', CAT);
+    indexCat(); syncState='ok'; syncLabel(); fillMakes(); if (shown) compute();
+  }catch(e){ syncState='err'; syncLabel(); }
+}
+$('#sync').onclick = () => sync(true);
+
+let MAKES = [], MODELS_BY = {};
+function indexCat(){
+  MODELS_BY = {};
+  (CAT ? CAT.rows : []).forEach(r => { (MODELS_BY[r[0]] = MODELS_BY[r[0]] || new Set()).add(r[1]); });
+  MAKES = Object.keys(MODELS_BY).sort((a,b)=>a.localeCompare(b));
+  Object.keys(MODELS_BY).forEach(k => MODELS_BY[k] = [...MODELS_BY[k]].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})));
+}
+function fillMakes(){
+  const cur = $('#mk').value;
+  $('#mk').innerHTML = '<option value="">'+esc(T('pick'))+'…</option>' + MAKES.map(m=>`<option>${esc(m)}</option>`).join('');
+  if (cur && MAKES.includes(cur)) $('#mk').value = cur;
+  fillModels($('#md').value);
+}
+function fillModels(keep){
+  const list = MODELS_BY[$('#mk').value] || [];
+  $('#md').innerHTML = '<option value="">'+esc(T('pick'))+'…</option>' + list.map(m=>`<option>${esc(m)}</option>`).join('');
+  if (keep && list.includes(keep)) $('#md').value = keep;
+}
+
+// ---------- leer el mensaje ----------
+// 1) busca en el mensaje los modelos que existen en la Sheet; 2) respaldo: reglas de core.js
+function parseMsg(msg){
+  const p = C.localParse(msg);
+  const out = { make:'', model:'', year:p.year, drive:p.drive, inches:p.inches, kind:p.kind };
+  const S = C.squash(msg), low = ' ' + msg.toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' ';
+  const makeWords = { 'Chevy':/ (chevy|chevrolet|silverado) /, 'GMC':/ (gmc|sierra) /, 'Ford':/ (ford|f ?\d50) /, 'Ram':/ (ram|dodge) /, 'Dodge':/ (dodge|ram) /, 'Toyota':/ toyota /, 'Jeep':/ jeep /, 'Nissan':/ nissan /, 'Honda':/ honda /, 'Cadillac':/ cadillac /, 'Subaru':/ subaru /, 'Mitsubishi':/ mitsubishi /, 'Suzuki':/ suzuki / };
+  let best = null, bestLen = 0;
+  MAKES.forEach(mk => (MODELS_BY[mk]||[]).forEach(md => {
+    const k = C.squash(md); if (k.length < 3) return;
+    const numeric = !/[a-z]/.test(k);
+    if (numeric && !(makeWords[mk] && makeWords[mk].test(low))) return;
+    if (!S.includes(k)) return;
+    let score = k.length + (makeWords[mk] && makeWords[mk].test(low) ? 2 : 0);
+    if (score > bestLen){ best = [mk, md]; bestLen = score; }
+  }));
+  if (best){ out.make = best[0]; out.model = best[1]; }
+  else if (p.model){
+    out.make = C.makeLabel(p.model.mk);
+    const cand = (MODELS_BY[out.make]||[]).find(m => C.squash(m) === C.squash(p.model.label));
+    out.model = cand || '';
+  }
+  // Ram / Dodge según el año (Rough Country: Dodge hasta 2010)
+  if (out.year && (out.make === 'Ram' || out.make === 'Dodge')) fixRam(out);
+  return out;
+}
+function fixRam(o){
+  const num = (o.model.match(/(1500|2500|3500)/)||[])[1]; if (!num || /classic/i.test(o.model)) return;
+  if (o.year < 2011 && (MODELS_BY['Dodge']||[]).includes('Ram '+num)) { o.make='Dodge'; o.model='Ram '+num; }
+  else if (o.year >= 2011 && (MODELS_BY['Ram']||[]).includes(num)) { o.make='Ram'; o.model=num; }
+}
+
+// ---------- controles ----------
+function seg(id, key, def){
+  const box = $(id);
+  const set = v => box.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === (v==null?'':v)));
+  box.onclick = e => { const b=e.target.closest('button'); if(!b) return; set(b.dataset.v); if (key==='lang') LS.set('reply', b.dataset.v); if (shown) compute(); };
+  set(def);
+  return { get: () => (box.querySelector('.on')||{dataset:{v:''}}).dataset.v, set };
+}
+const drv = seg('#drv','drive','4WD'), knd = seg('#knd','kind',''), lng = seg('#lng','lang',LS.get('reply','auto'));
+$('#mk').onchange = () => { fillModels(); if (shown) compute(); };
+['#md','#yr','#in','#trim'].forEach(s => $(s).addEventListener(s==='#md'?'change':'input', () => { if (shown) compute(); }));
+
+$('#paste').onclick = async () => {
+  try { const t = await navigator.clipboard.readText(); if (t) { $('#msg').value = t; $('#msg').focus(); return; } } catch(e) {}
+  $('#msg').focus(); toast(T('paste_hint'));
+};
+$('#go').onclick = () => quote();
+$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) quote(); });
+
+let shown = false, lastMsg = '';
+function quote(){
+  const msg = $('#msg').value.trim();
+  lastMsg = msg;
+  if (msg){
+    const p = parseMsg(msg);
+    if (p.make){ $('#mk').value = p.make; fillModels(p.model); }
+    else { $('#mk').value = ''; fillModels(); }
+    $('#md').value = p.model || '';
+    $('#yr').value = p.year || '';
+    $('#in').value = p.inches != null ? C.inchStr(p.inches) : '';
+    drv.set(p.drive || ''); knd.set(p.kind || '');
+    $('#trim').value = '';
+    duallyTouched = false;
+  }
+  shown = true;
+  compute(true);
+}
+
+// ---------- calcular ----------
+let duallyTouched = false, duallyOn = false, current = null;
+function compute(jump){
+  const mk = $('#mk').value, md = $('#md').value, yr = parseInt($('#yr').value,10);
+  ['#mk','#md','#yr'].forEach(s=>$(s).classList.remove('miss'));
+  const miss = [];
+  if (!mk){ miss.push(T('missMake')); $('#mk').classList.add('miss'); }
+  if (!md){ miss.push(T('missModel')); $('#md').classList.add('miss'); }
+  if (!(yr>=1950 && yr<=2100)){ miss.push(T('missYear')); $('#yr').classList.add('miss'); }
+  if (miss.length){ current = { miss }; render(); if (jump) jumpTo(); return; }
+
+  let o = { make:mk, model:md, year:yr };
+  let rows = pick(o);
+  if (!rows.length && (mk==='Ram'||mk==='Dodge')){ const o2 = Object.assign({}, o); fixRam(o2); if (o2.make!==mk){ o = o2; rows = pick(o); } }
+
+  const inch = parseFloat(($('#in').value||'').replace(',','.'));
+  const replyV = lng.get();
+  const lang = replyV === 'auto' ? (C.isSpanish(lastMsg) ? 'es' : 'en') : replyV;
+  const canDually = C.hasDually({ md:o.model, label:o.model }, []) || rows.some(r => r[13]==='yes');
+  const words = lastMsg + ' ' + $('#trim').value;
+  if (!duallyTouched) duallyOn = canDually && C.mentionsDually(words);
+  const q = { model:{ match:/./ }, year:null, drive:drv.get()||null, inches: inch>0&&inch<=12 ? inch : null, kind:knd.get()||null, lang, dually: canDually && duallyOn };
+  const byUrl = {};
+  const items = rows.map(r => { const it = { title:r[10], price:r[8], starting:!!r[9], url:r[11] || r[10], _r:r }; byUrl[it.url] = r; return it; });
+  const res = C.buildQuote(items, q);
+  current = { o, rows, res, q, byUrl, canDually, words };
+  render();
+  if (jump) jumpTo();
+}
+function pick(o){
+  if (!CAT) return [];
+  return CAT.rows.filter(r => r[0]===o.make && r[1]===o.model && (!r[3] || r[3] <= o.year) && (!r[4] || r[4] >= o.year));
+}
+function jumpTo(){ if (window.innerWidth <= 860) $('#resSec').scrollIntoView({ block:'start' }); }
+
+// ---------- pintar ----------
+function render(){
+  const box = $('#res');
+  if (!current){
+    box.innerHTML = `<div class="empty"><div><b>${esc(T('emptyT'))}</b><ol><li>${esc(T('empty1'))}</li><li>${esc(T('empty2'))}</li><li>${esc(T('empty3'))}</li></ol></div></div>`;
+    return;
+  }
+  if (current.miss){
+    box.innerHTML = `<div class="note n-o"><b>${esc(T('missTitle'))}</b>${current.miss.map(esc).join(' · ')}</div>`;
+    return;
+  }
+  const { o, rows, res, q, byUrl, canDually, words } = current;
+  const trimTxt = $('#trim').value.trim();
+  const rcMake = C.slugify(o.make), rcModel = C.slugify(o.model);
+  let h = `<div class="res-head"><div class="veh">${esc(o.year)} ${esc(o.model)}${q.drive ? ' <small>'+(q.drive==='4WD'?'4x4':'4x2')+'</small>' : ''}</div>${trimTxt?`<span class="pill">${esc(trimTxt)}</span>`:''}<a class="rc" href="https://www.roughcountry.com/lift-kits/${rcMake}/${rcModel}/${o.year}" target="_blank" rel="noopener">${esc(T('rc'))} ↗</a></div>`;
+
+  if (!rows.length){ box.innerHTML = h + `<div class="none">${esc(T('noneAtAll'))}</div>`; return; }
+
+  if (canDually) h += `<div class="dually"><b>⚠ ${esc(T('duallyT'))}</b><label><input type="checkbox" id="dcb" ${q.dually?'checked':''}> ${esc(T('duallyL'))}</label></div>`;
+
+  res.blocks.forEach((b, bi) => {
+    if (res.blocks.length > 1) h += `<div class="dtitle">${b.drive==='4WD'?'4x4':'4x2'}</div>`;
+    if (!b.kits.length){
+      const sizes = [...new Set(b.sizes.map(k => (k.kind==='leveling'?'leveling ':'lift ') + C.inchStr(k.inches) + '"'))];
+      h += `<div class="none"><b>${esc(T('noKitsT'))}.</b> ${sizes.length ? esc(T('avail'))+': '+esc(sizes.join(', ')) : ''}</div>`;
+      return;
+    }
+    // alertas por versión (Fitment notes)
+    const byPhrase = {}, noD = [];
+    b.kits.forEach(k => {
+      const r = byUrl[k.url]; if (!r) return;
+      const name = C.inchStr(k.inches)+'" '+(k.kind==='leveling'?'leveling':'lift')+' kit';
+      if (r[14]) C.fitmentAlerts(String(r[14]).split(' • '), words).forEach(a => { (byPhrase[a.phrase] = byPhrase[a.phrase] || { note:a.note, kits:[] }).kits.push(name); });
+      if (q.dually && r[13]==='no') noD.push(name);
+    });
+    Object.keys(byPhrase).forEach(ph => { const x = byPhrase[ph]; h += `<div class="note n-r"><b>⚠ ${esc(T('fitT',{p:ph}))}</b>${esc(T('fitB',{k:x.kits.join(', ')}))}<span class="src">Rough Country: "${esc(x.note)}"</span></div>`; });
+    if (noD.length) h += `<div class="note n-r"><b>⚠ ${esc(T('noDually'))}</b>${esc(T('noDuallyB',{k:noD.join(', ')}))}</div>`;
+    if (b.nearest){
+      const n = b.nearest, parts = [];
+      if (n.lower != null) parts.push(C.inchStr(n.lower)+'" ('+T('lower')+')');
+      if (n.higher != null) parts.push(C.inchStr(n.higher)+'" ('+T('higher')+')');
+      h += `<div class="note n-o"><b>${esc(T('nearT',{a:C.inchStr(n.asked)}))}</b>${esc(T('nearB',{s:parts.join(UI==='es'?' y ':' and ')}))}</div>`;
+    }
+    h += `<div class="quote" id="q${bi}">${esc(b.text)}</div><button class="btn p copy" data-b="${bi}">${esc(T('copy'))}</button>`;
+    h += `<div class="cols"><div class="card sub"><div class="h">${esc(T('kitsT'))}</div>`;
+    b.kits.forEach(k => {
+      const r = byUrl[k.url] || [];
+      const d = r[2] || '', yrs = (r[3]||'') + (r[4] ? '–'+r[4] : (r[3]?'+':''));
+      const name = `${C.inchStr(k.inches)}" ${k.kind==='leveling'?'Leveling':'Lift'} Kit`;
+      h += `<div class="kit"><div>${r[11]?`<a href="${esc(r[11])}" target="_blank" rel="noopener">${esc(name)} ↗</a>`:esc(name)}<div class="t">${esc(d)}${yrs?' · '+esc(yrs):''}${k.starting?' · from':''}</div></div><div class="p"><s>$${esc(k.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}))}</s>${esc(C.money(k.sale))}${q.dually?`<small>${esc(T('dually'))}</small>`:''}</div></div>`;
+    });
+    h += `</div><div class="card sub"><div class="h">${esc(T('timeT'))}</div>`;
+    b.kits.forEach(k => { const r = byUrl[k.url] || []; h += `<div class="time"><span>${C.inchStr(k.inches)}" ${k.kind==='leveling'?'leveling':'lift'}</span><b>${esc(r[12] || T('noTime'))}</b></div>`; });
+    h += `</div></div>`;
+  });
+  h += `<div class="foot">${esc(T('foot'))}</div>`;
+  box.innerHTML = h;
+
+  const dcb = $('#dcb'); if (dcb) dcb.onchange = () => { duallyTouched = true; duallyOn = dcb.checked; compute(); };
+  box.querySelectorAll('.copy').forEach(btn => btn.onclick = () => copy(res.blocks[+btn.dataset.b].text, btn));
+}
+
+async function copy(text, btn){
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ ok=document.execCommand('copy'); }catch(_){} ta.remove(); }
+  if (ok){ btn.classList.add('done'); btn.textContent = '✓ ' + T('copied'); setTimeout(()=>{ btn.classList.remove('done'); btn.textContent = T('copy'); }, 1500); }
+  else toast(T('copyFail'));
+  if (ok && current && current.o){
+    const v = current.o.year+' '+current.o.make+' '+current.o.model+(current.q.drive?' '+(current.q.drive==='4WD'?'4x4':'4x2'):'')+($('#trim').value?' · '+$('#trim').value:'');
+    fetch(SHEET, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body: JSON.stringify({ copy:{ vehiculo:v, mensaje:lastMsg.slice(0,600), texto:text } }) }).catch(()=>{});
+  }
+}
+
+// ---------- inicio ----------
+indexCat();
+applyUI();
+sync(false);
+})();
+</script>
+</body>
+</html>
