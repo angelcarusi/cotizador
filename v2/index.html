@@ -399,10 +399,14 @@ function render(){
     b.kits.forEach(k => {
       const r = byUrl[k.url]; if (!r) return;
       const name = C.inchStr(k.inches)+'" '+(k.kind==='leveling'?'leveling':'lift')+' kit';
-      if (r[14]) C.fitmentAlerts(String(r[14]).split(' • '), words).forEach(a => { (byPhrase[a.phrase] = byPhrase[a.phrase] || { note:a.note, kits:[] }).kits.push(name); });
+      if (r[14]) C.fitmentAlerts(String(r[14]).split(' • '), words).forEach(a => {
+        const x = (byPhrase[a.note] = byPhrase[a.note] || { note:a.note, kits:[], ph:[] });
+        if (!x.kits.includes(name)) x.kits.push(name);
+        if (!x.ph.includes(a.phrase)) x.ph.push(a.phrase);
+      });
       if (q.dually && r[13]==='no') noD.push(name);
     });
-    Object.keys(byPhrase).forEach(ph => { const x = byPhrase[ph]; h += `<div class="note n-r"><b>⚠ ${esc(T('fitT',{p:ph}))}</b>${esc(T('fitB',{k:x.kits.join(', ')}))}<span class="src">Rough Country: "${esc(x.note)}"</span></div>`; });
+    Object.keys(byPhrase).forEach(nk => { const x = byPhrase[nk]; h += `<div class="note n-r"><b>⚠ ${esc(T('fitT',{p:x.ph.join(' / ')}))}</b>${esc(T('fitB',{k:x.kits.join(', ')}))}<span class="src">Rough Country: "${esc(x.note)}"</span></div>`; });
     if (noD.length) h += `<div class="note n-r"><b>⚠ ${esc(T('noDually'))}</b>${esc(T('noDuallyB',{k:noD.join(', ')}))}</div>`;
     if (b.nearest){
       const n = b.nearest, parts = [];
