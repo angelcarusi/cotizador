@@ -242,9 +242,18 @@ async function sync(force){
 $('#sync').onclick = () => sync(true);
 
 let MAKES = [], MODELS_BY = {};
+// Rough Country nombra el mismo vehículo de varias formas ("Gladiator" / "Gladiator JT",
+// "Wrangler JL", "Silverado 1500 LD", "Sierra 1500 Limited"…). Se agrupan bajo un nombre base;
+// el año ya separa las generaciones. "Bronco Sport", "Bronco II", "1500 Classic" siguen separados.
+const CODE = /^(?:[A-Z]{2}\d?|[A-Z]\d{2}|LD|HD|Limited|Unlimited|LTD)$/;
+function baseModel(name){
+  const t = String(name).trim().split(/\s+/);
+  while (t.length > 1 && CODE.test(t[t.length-1]) && t[t.length-1] !== 'II') t.pop();
+  return t.join(' ');
+}
 function indexCat(){
   MODELS_BY = {};
-  (CAT ? CAT.rows : []).forEach(r => { (MODELS_BY[r[0]] = MODELS_BY[r[0]] || new Set()).add(r[1]); });
+  (CAT ? CAT.rows : []).forEach(r => { (MODELS_BY[r[0]] = MODELS_BY[r[0]] || new Set()).add(baseModel(r[1])); });
   MAKES = Object.keys(MODELS_BY).sort((a,b)=>a.localeCompare(b));
   Object.keys(MODELS_BY).forEach(k => MODELS_BY[k] = [...MODELS_BY[k]].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})));
 }
@@ -364,7 +373,7 @@ function compute(jump){
 }
 function pick(o){
   if (!CAT) return [];
-  return CAT.rows.filter(r => r[0]===o.make && r[1]===o.model && (!r[3] || r[3] <= o.year) && (!r[4] || r[4] >= o.year));
+  return CAT.rows.filter(r => r[0]===o.make && baseModel(r[1])===o.model && (!r[3] || r[3] <= o.year) && (!r[4] || r[4] >= o.year));
 }
 function jumpTo(){ if (window.innerWidth <= 860) $('#resSec').scrollIntoView({ block:'start' }); }
 
