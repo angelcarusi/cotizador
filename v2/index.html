@@ -110,6 +110,7 @@ textarea::placeholder,input::placeholder{color:#6c737d}
 .time:first-of-type{border-top:0;padding-top:0}
 .time b{color:var(--acc);white-space:nowrap}
 .foot{font-size:12px;color:var(--mute);margin-top:14px;text-align:center}
+.fixed{font-size:12.5px;color:var(--mute);margin:-6px 0 12px}
 .none{padding:12px;border:1px dashed var(--line2);border-radius:8px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:9}
 
@@ -186,7 +187,7 @@ const TX = {
     base:'base',nearT:'No {a}" kit for this truck',nearB:'Showing the closest sizes: {s}.',lower:'lower',higher:'higher',
     noKitsT:'No kits for this selection',avail:'Available sizes',noneAtAll:'No kits saved for this vehicle and year. Check the year or open Rough Country.',
     fitT:'{p} does not fit',fitB:'Does not fit: {k}.',duallyT:'This model has a dually version',duallyL:'It is dually (+$200)',noDually:'Not for dually',noDuallyB:'Does not fit dually models: {k}.',
-    rc:'View on Rough Country',foot:'Prices from the Rough Country catalog · saved to History when you copy',
+    rc:'View on Rough Country',fixed:'Read as',foot:'Prices from the Rough Country catalog · saved to History when you copy',
     t4:'4x4',t2:'4x2',paste_hint:'Press and hold in the box and choose Paste',dually:'dually +$200'},
   es:{tagline:'Cotizaciones lift y leveling',s1:'Mensaje del cliente',s2:'Vehículo',s3:'Cotización',hint2:'Revisa o cámbialo',paste:'Pegar',quote:'Cotizar',make:'Marca',model:'Modelo',year:'Año',lift:'Pulgadas',trim:'Versión',drive:'Tracción',both:'Ambas',type:'Tipo',all:'Todos',reply:'Idioma de la respuesta',english:'Inglés',spanish:'Español',
     ph_msg:'Pega aquí el mensaje del cliente',ph_all:'Todas',ph_trim:'Opcional: ZR2, Trail Boss, diesel, dually…',
@@ -197,7 +198,7 @@ const TX = {
     base:'base',nearT:'No hay kit de {a}" para esta camioneta',nearB:'Te muestro las medidas más cercanas: {s}.',lower:'menor',higher:'mayor',
     noKitsT:'No hay kits para esta selección',avail:'Medidas disponibles',noneAtAll:'No hay kits guardados para este vehículo y año. Revisa el año o abre Rough Country.',
     fitT:'{p} no es compatible',fitB:'No le sirve: {k}.',duallyT:'Este modelo tiene versión dually',duallyL:'Es dually (+$200)',noDually:'No sirve para dually',noDuallyB:'No le sirve a dually: {k}.',
-    rc:'Ver en Rough Country',foot:'Precios del catálogo de Rough Country · se guarda en History al copiar',
+    rc:'Ver en Rough Country',fixed:'Entendí',foot:'Precios del catálogo de Rough Country · se guarda en History al copiar',
     t4:'4x4',t2:'4x2',paste_hint:'Mantén presionado en el cuadro y elige Pegar',dually:'dually +$200'}
 };
 let UI = LS.get('ui', 'en');
@@ -236,7 +237,7 @@ async function sync(force){
     const j = await fetch(SHEET+'?catalog=1').then(r=>r.json());
     if (!j || !j.ok || !Array.isArray(j.rows)) throw new Error('bad');
     CAT = { v:j.v, ts:Date.now(), rows:j.rows }; LS.set('cat', CAT);
-    indexCat(); syncState='ok'; syncLabel(); fillMakes(); if (shown) compute();
+    indexCat(); VOCAB = []; syncState='ok'; syncLabel(); fillMakes(); if (shown) compute();
   }catch(e){ syncState='err'; syncLabel(); }
 }
 $('#sync').onclick = () => sync(true);
@@ -271,7 +272,55 @@ function fillModels(keep){
 
 // ---------- leer el mensaje ----------
 // 1) busca en el mensaje los modelos que existen en la Sheet; 2) respaldo: reglas de core.js
+// ---------- corregir palabras mal escritas ("Silberado" → Silverado, "Jep" → Jeep) ----------
+const STOP = new Set();
+const STOP2 = new Set(('para una uno tengo del con que cuanto cuánto sale precio precios quiero levantar levantarla pulgadas pulgada troca camioneta llantas rines nivelar año modelo hola gracias buenas tiene tienen como esta este esto mas por favor').split(' '));
+'for the and my how much price prices lift lifts lifted kit kits level leveling inch inches tire tires truck trucks have has what will can get need want with from about year years your you yes thanks hello hey this that there they them then than when where which would could should just like also only more most some does dont cost quote quotes rim rims keep made make model wheel wheels stock size sizes four door crew cab bed long short base sport plus pro best new old used'.split(' ').forEach(w=>STOP.add(w));
+let VOCAB = [];
+function buildVocab(){
+  const s = new Set(['chevy','chevrolet','silverado','sierra','dodge','toyota','nissan','jeep','ford','gmc','ram','honda','cadillac','subaru','mitsubishi','suzuki','dually','diesel','raptor','duramax','cummins','powerstroke']);
+  MAKES.forEach(m => s.add(m.toLowerCase()));
+  Object.values(MODELS_BY).forEach(list => list.forEach(md => md.toLowerCase().split(/[^a-z0-9]+/).forEach(w => { if (w.length >= 3 && /[a-z]/.test(w)) s.add(w); })));
+  VOCAB = [...s];
+}
+function dist(a, b, max){
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const d = []; for (let i = 0; i <= a.length; i++) { d[i] = [i]; }
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) { let rowMin = 99;
+    for (let j = 1; j <= b.length; j++) {
+      const c = a[i-1] === b[j-1] ? 0 : 1;
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + c);
+      if (i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) d[i][j] = Math.min(d[i][j], d[i-2][j-2] + 1);
+      rowMin = Math.min(rowMin, d[i][j]);
+    }
+    if (rowMin > max) return max + 1;
+  }
+  return d[a.length][b.length];
+}
+let FIXED = [];
+function fixTypos(msg){
+  FIXED = [];
+  if (!VOCAB.length) buildVocab();
+  return msg.replace(/[A-Za-zÀ-ÿ]{3,}/g, w => {
+    const lw = w.toLowerCase();
+    if (STOP.has(lw) || STOP2.has(lw) || VOCAB.includes(lw)) return w;
+    const max = lw.length <= 5 ? 1 : 2;
+    let best = null, bd = max + 1;
+    VOCAB.forEach(v => {
+      if (v.length < 3) return;
+      if (lw.length <= 4 && v.length > lw.length + 1) return;   // "jep" → jeep, pero no palabras largas
+      if (max === 2 && v[0] !== lw[0]) return;                  // en palabras largas, misma primera letra
+      const dd = dist(lw, v, max);
+      if (dd < bd || (dd === bd && best && Math.abs(v.length - lw.length) < Math.abs(best.length - lw.length))) { bd = dd; best = v; }
+    });
+    if (best && bd <= max) { FIXED.push(w + ' → ' + best); return best; }
+    return w;
+  });
+}
+
 function parseMsg(msg){
+  msg = fixTypos(msg);
   const p = C.localParse(msg);
   const out = { make:'', model:'', year:p.year, drive:p.drive, inches:p.inches, kind:p.kind };
   const S = C.squash(msg), low = ' ' + msg.toLowerCase().replace(/[^a-z0-9]+/g,' ') + ' ';
@@ -393,6 +442,7 @@ function render(){
   const rcMake = C.slugify(o.make), rcModel = C.slugify(o.model);
   let h = `<div class="res-head"><div class="veh">${esc(o.year)} ${esc(o.model)}${q.drive ? ' <small>'+(q.drive==='4WD'?'4x4':'4x2')+'</small>' : ''}</div>${trimTxt?`<span class="pill">${esc(trimTxt)}</span>`:''}<a class="rc" href="https://www.roughcountry.com/lift-kits/${rcMake}/${rcModel}/${o.year}" target="_blank" rel="noopener">${esc(T('rc'))} ↗</a></div>`;
 
+  if (FIXED.length) h += `<div class="fixed">${esc(T('fixed'))}: ${FIXED.map(esc).join(' · ')}</div>`;
   if (!rows.length){ box.innerHTML = h + `<div class="none">${esc(T('noneAtAll'))}</div>`; return; }
 
   if (canDually) h += `<div class="dually"><b>⚠ ${esc(T('duallyT'))}</b><label><input type="checkbox" id="dcb" ${q.dually?'checked':''}> ${esc(T('duallyL'))}</label></div>`;
