@@ -138,7 +138,7 @@ textarea::placeholder,input::placeholder{color:#6c737d}
   <section>
     <div class="h"><em>1</em><span data-t="s1">Customer message</span></div>
     <div class="card">
-      <textarea id="msg" data-ph="ph_msg" placeholder="Paste the customer's message here"></textarea>
+      <textarea id="msg" enterkeyhint="go" data-ph="ph_msg" placeholder="Paste the customer's message here"></textarea>
       <div class="row">
         <button class="btn" id="paste" data-t="paste">Paste</button>
         <button class="btn p" id="go" data-t="quote">Quote</button>
@@ -149,9 +149,9 @@ textarea::placeholder,input::placeholder{color:#6c737d}
     <div class="card grid">
       <div class="f"><label for="mk" data-t="make">Make</label><select id="mk"></select></div>
       <div class="f"><label for="md" data-t="model">Model</label><select id="md"></select></div>
-      <div class="f"><label for="yr" data-t="year">Year</label><input id="yr" inputmode="numeric" maxlength="4" placeholder="2021"></div>
-      <div class="f"><label for="in" data-t="lift">Lift</label><input id="in" inputmode="decimal" data-ph="ph_all" placeholder="All sizes"></div>
-      <div class="f full"><label for="trim" data-t="trim">Trim / version</label><input id="trim" data-ph="ph_trim" placeholder="Optional: ZR2, Trail Boss, diesel, dually…"></div>
+      <div class="f"><label for="yr" data-t="year">Year</label><input id="yr" enterkeyhint="go" inputmode="numeric" maxlength="4" placeholder="2021"></div>
+      <div class="f"><label for="in" data-t="lift">Lift</label><input id="in" enterkeyhint="go" inputmode="decimal" data-ph="ph_all" placeholder="All sizes"></div>
+      <div class="f full"><label for="trim" data-t="trim">Trim / version</label><input id="trim" enterkeyhint="go" data-ph="ph_trim" placeholder="Optional: ZR2, Trail Boss, diesel, dually…"></div>
       <div class="f full"><label data-t="drive">Drive</label><div class="seg" id="drv"><button data-v="4WD" class="on">4x4</button><button data-v="2WD">4x2</button><button data-v="" data-t="both">Both</button></div></div>
       <div class="f full"><label data-t="type">Type</label><div class="seg" id="knd"><button data-v="" class="on" data-t="all">All</button><button data-v="leveling">Leveling</button><button data-v="lift">Lift</button></div></div>
       <div class="f full"><label data-t="reply">Reply language</label><div class="seg" id="lng"><button data-v="auto" class="on">Auto</button><button data-v="en" data-t="english">English</button><button data-v="es" data-t="spanish">Spanish</button></div></div>
@@ -309,7 +309,10 @@ $('#paste').onclick = async () => {
   $('#msg').focus(); toast(T('paste_hint'));
 };
 $('#go').onclick = () => quote();
-$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) quote(); });
+// Enter = Cotizar (Shift+Enter hace un salto de línea en el mensaje)
+$('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); quote(); } });
+// En los campos del vehículo, Enter recalcula sin volver a leer el mensaje
+['#yr','#in','#trim'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); shown = true; compute(true); e.target.blur(); } }));
 
 let shown = false, lastMsg = '';
 function quote(){
