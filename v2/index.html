@@ -110,6 +110,10 @@ textarea::placeholder,input::placeholder{color:#6c737d}
 .time:first-of-type{border-top:0;padding-top:0}
 .time b{color:var(--acc);white-space:nowrap}
 .foot{font-size:12px;color:var(--mute);margin-top:14px;text-align:center}
+.xbtn{display:inline-block;margin-top:9px;border:1px solid #a33a40;background:#3a1518;color:#ffd0d0;border-radius:7px;padding:8px 12px;font:700 14px var(--cond);letter-spacing:.5px;text-transform:uppercase}
+.xbtn:hover{background:#4a1a1e}
+.xbtn.out{border-color:var(--line2);background:var(--panel2);color:var(--fg)}
+.kit.gone{opacity:.45}.kit.gone .p{text-decoration:line-through}
 .fixed{font-size:12.5px;color:var(--mute);margin:-6px 0 12px}
 .none{padding:12px;border:1px dashed var(--line2);border-radius:8px;color:var(--mute)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;z-index:9}
@@ -187,7 +191,7 @@ const TX = {
     base:'base',nearT:'No {a}" kit for this truck',nearB:'Showing the closest sizes: {s}.',lower:'lower',higher:'higher',
     noKitsT:'No kits for this selection',avail:'Available sizes',noneAtAll:'No kits saved for this vehicle and year. Check the year or open Rough Country.',
     fitT:'{p} does not fit',fitB:'Does not fit: {k}.',duallyT:'This model has a dually version',duallyL:'It is dually (+$200)',noDually:'Not for dually',noDuallyB:'Does not fit dually models: {k}.',
-    rc:'View on Rough Country',fixed:'Read as',foot:'Prices from the Rough Country catalog · saved to History when you copy',
+    rc:'View on Rough Country',fixed:'Read as',removeKits:'Remove from quote',addBack:'Add back to quote',allRemoved:'All kits were removed from the quote.',gone:'removed',foot:'Prices from the Rough Country catalog · saved to History when you copy',
     t4:'4x4',t2:'4x2',paste_hint:'Press and hold in the box and choose Paste',dually:'dually +$200'},
   es:{tagline:'Cotizaciones lift y leveling',s1:'Mensaje del cliente',s2:'Vehículo',s3:'Cotización',hint2:'Revisa o cámbialo',paste:'Pegar',quote:'Cotizar',make:'Marca',model:'Modelo',year:'Año',lift:'Pulgadas',trim:'Versión',drive:'Tracción',both:'Ambas',type:'Tipo',all:'Todos',reply:'Idioma de la respuesta',english:'Inglés',spanish:'Español',
     ph_msg:'Pega aquí el mensaje del cliente',ph_all:'Todas',ph_trim:'Opcional: ZR2, Trail Boss, diesel, dually…',
@@ -198,7 +202,7 @@ const TX = {
     base:'base',nearT:'No hay kit de {a}" para esta camioneta',nearB:'Te muestro las medidas más cercanas: {s}.',lower:'menor',higher:'mayor',
     noKitsT:'No hay kits para esta selección',avail:'Medidas disponibles',noneAtAll:'No hay kits guardados para este vehículo y año. Revisa el año o abre Rough Country.',
     fitT:'{p} no es compatible',fitB:'No le sirve: {k}.',duallyT:'Este modelo tiene versión dually',duallyL:'Es dually (+$200)',noDually:'No sirve para dually',noDuallyB:'No le sirve a dually: {k}.',
-    rc:'Ver en Rough Country',fixed:'Entendí',foot:'Precios del catálogo de Rough Country · se guarda en History al copiar',
+    rc:'Ver en Rough Country',fixed:'Entendí',removeKits:'Quitar del mensaje',addBack:'Volver a poner en el mensaje',allRemoved:'Quitaste todos los kits del mensaje.',gone:'quitado',foot:'Precios del catálogo de Rough Country · se guarda en History al copiar',
     t4:'4x4',t2:'4x2',paste_hint:'Mantén presionado en el cuadro y elige Pegar',dually:'dually +$200'}
 };
 let UI = LS.get('ui', 'en');
@@ -373,7 +377,9 @@ $('#msg').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKe
 ['#yr','#in','#trim'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); shown = true; compute(true); e.target.blur(); } }));
 
 let shown = false, lastMsg = '';
+const EXCL = new Set();   // kits quitados del mensaje por el usuario
 function quote(){
+  EXCL.clear();
   const msg = $('#msg').value.trim();
   lastMsg = msg;
   if (msg){
@@ -457,32 +463,36 @@ function render(){
       return;
     }
     // alertas por versión (Fitment notes)
-    const byPhrase = {}, noD = [];
+    const byPhrase = {}, noD = [], noDU = [];
     b.kits.forEach(k => {
       const r = byUrl[k.url]; if (!r) return;
       const name = C.inchStr(k.inches)+'" '+(k.kind==='leveling'?'leveling':'lift')+' kit';
       if (r[14]) C.fitmentAlerts(String(r[14]).split(' • '), words).forEach(a => {
-        const x = (byPhrase[a.note] = byPhrase[a.note] || { note:a.note, kits:[], ph:[] });
-        if (!x.kits.includes(name)) x.kits.push(name);
+        const x = (byPhrase[a.note] = byPhrase[a.note] || { note:a.note, kits:[], ph:[], urls:[] });
+        if (!x.kits.includes(name)) { x.kits.push(name); x.urls.push(k.url); }
         if (!x.ph.includes(a.phrase)) x.ph.push(a.phrase);
       });
-      if (q.dually && r[13]==='no') noD.push(name);
+      if (q.dually && r[13]==='no') { noD.push(name); noDU.push(k.url); }
     });
-    Object.keys(byPhrase).forEach(nk => { const x = byPhrase[nk]; h += `<div class="note n-r"><b>⚠ ${esc(T('fitT',{p:x.ph.join(' / ')}))}</b>${esc(T('fitB',{k:x.kits.join(', ')}))}<span class="src">Rough Country: "${esc(x.note)}"</span></div>`; });
-    if (noD.length) h += `<div class="note n-r"><b>⚠ ${esc(T('noDually'))}</b>${esc(T('noDuallyB',{k:noD.join(', ')}))}</div>`;
+    const toggleBtn = urls => { const out = urls.every(u => EXCL.has(u)); return `<button class="xbtn${out?' out':''}" data-urls="${esc(JSON.stringify(urls))}">${out ? '＋ '+esc(T('addBack')) : '✕ '+esc(T('removeKits'))}</button>`; };
+    Object.keys(byPhrase).forEach(nk => { const x = byPhrase[nk]; h += `<div class="note n-r"><b>⚠ ${esc(T('fitT',{p:x.ph.join(' / ')}))}</b>${esc(T('fitB',{k:x.kits.join(', ')}))}<span class="src">Rough Country: "${esc(x.note)}"</span>${toggleBtn(x.urls)}</div>`; });
+    if (noD.length) h += `<div class="note n-r"><b>⚠ ${esc(T('noDually'))}</b>${esc(T('noDuallyB',{k:noD.join(', ')}))}${toggleBtn(noDU)}</div>`;
+    // texto final sin los kits quitados
+    const keep = b.kits.filter(k => !EXCL.has(k.url));
+    b.shown = keep.map(k => C.lineFor(k, q.lang)).join('\n\n');
     if (b.nearest){
       const n = b.nearest, parts = [];
       if (n.lower != null) parts.push(C.inchStr(n.lower)+'" ('+T('lower')+')');
       if (n.higher != null) parts.push(C.inchStr(n.higher)+'" ('+T('higher')+')');
       h += `<div class="note n-o"><b>${esc(T('nearT',{a:C.inchStr(n.asked)}))}</b>${esc(T('nearB',{s:parts.join(UI==='es'?' y ':' and ')}))}</div>`;
     }
-    h += `<div class="quote" id="q${bi}">${esc(b.text)}</div><button class="btn p copy" data-b="${bi}">${esc(T('copy'))}</button>`;
+    h += keep.length ? `<div class="quote" id="q${bi}">${esc(b.shown)}</div><button class="btn p copy" data-b="${bi}">${esc(T('copy'))}</button>` : `<div class="none">${esc(T('allRemoved'))}</div>`;
     h += `<div class="cols"><div class="card sub"><div class="h">${esc(T('kitsT'))}</div>`;
     b.kits.forEach(k => {
       const r = byUrl[k.url] || [];
       const d = r[2] || '', yrs = (r[3]||'') + (r[4] ? '–'+r[4] : (r[3]?'+':''));
       const name = `${C.inchStr(k.inches)}" ${k.kind==='leveling'?'Leveling':'Lift'} Kit`;
-      h += `<div class="kit"><div>${r[11]?`<a href="${esc(r[11])}" target="_blank" rel="noopener">${esc(name)} ↗</a>`:esc(name)}<div class="t">${esc(d)}${yrs?' · '+esc(yrs):''}${k.starting?' · from':''}</div></div><div class="p"><s>$${esc(k.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}))}</s>${esc(C.money(k.sale))}${q.dually?`<small>${esc(T('dually'))}</small>`:''}</div></div>`;
+      h += `<div class="kit${EXCL.has(k.url)?' gone':''}"><div>${r[11]?`<a href="${esc(r[11])}" target="_blank" rel="noopener">${esc(name)} ↗</a>`:esc(name)}<div class="t">${esc(d)}${yrs?' · '+esc(yrs):''}${k.starting?' · from':''}</div></div><div class="p"><s>$${esc(k.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}))}</s>${esc(C.money(k.sale))}${q.dually?`<small>${esc(T('dually'))}</small>`:''}</div></div>`;
     });
     h += `</div><div class="card sub"><div class="h">${esc(T('timeT'))}</div>`;
     b.kits.forEach(k => { const r = byUrl[k.url] || []; h += `<div class="time"><span>${C.inchStr(k.inches)}" ${k.kind==='leveling'?'leveling':'lift'}</span><b>${esc(r[12] || T('noTime'))}</b></div>`; });
@@ -492,7 +502,11 @@ function render(){
   box.innerHTML = h;
 
   const dcb = $('#dcb'); if (dcb) dcb.onchange = () => { duallyTouched = true; duallyOn = dcb.checked; compute(); };
-  box.querySelectorAll('.copy').forEach(btn => btn.onclick = () => copy(res.blocks[+btn.dataset.b].text, btn));
+  box.querySelectorAll('.copy').forEach(btn => btn.onclick = () => copy(res.blocks[+btn.dataset.b].shown, btn));
+  box.querySelectorAll('.xbtn').forEach(btn => btn.onclick = () => {
+    const urls = JSON.parse(btn.dataset.urls); const out = urls.every(u => EXCL.has(u));
+    urls.forEach(u => out ? EXCL.delete(u) : EXCL.add(u)); render();
+  });
 }
 
 async function copy(text, btn){
